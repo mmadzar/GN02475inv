@@ -62,7 +62,7 @@
 #define INVERTER_TX 17
 #define UART_TIMEOUT (100 / portTICK_PERIOD_MS)
 #define UART_MESSBUF_SIZE 100
-#define LED_BUILTIN 13 //clashes with SDIO, need to change to suit hardware and uncomment lines
+#define LED_BUILTIN 2 //clashes with SDIO, need to change to suit hardware and uncomment lines
 
 #define RESERVED_SD_SPACE 2000000000
 #define SDIO_BUFFER_SIZE 16384
