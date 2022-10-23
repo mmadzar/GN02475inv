@@ -46,7 +46,6 @@
 #include <WebServer.h>
 #include <HTTPUpdateServer.h>
 #include <ESPmDNS.h>
-#include <ArduinoOTA.h>
 #include <FS.h>
 #include <Ticker.h>
 
@@ -56,6 +55,10 @@
 #include <time.h>
 #include "driver/uart.h"
 
+#include "appconfig.h"
+#include "status.h"
+#include "WiFiOTA.h"
+#include "MqttPubSub.h"
 #include "Bytes2WiFi.h"
 
 #define DBG_OUTPUT_PORT Serial
@@ -74,10 +77,20 @@
 
 // HardwareSerial Inverter(INVERTER_PORT);
 
-const char *host = "inverter";
+const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
+
+long loops = 0;
+long lastLoopReport = 0;
+Status status;
+PinsSettings pins;
+Intervals intervals;
+WiFiSettings wifiSettings;
+MqttSettings mqttSettings;
+WiFiOTA wota;
+MqttPubSub mqtt;
 
 WebServer server(80);
 HTTPUpdateServer updater;
@@ -841,7 +854,9 @@ void setup(void)
   // WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.setSleep(false);
   WiFi.setTxPower(WIFI_POWER_19_5dBm); // 25); //dbm
-  WiFi.begin();
+
+  wota.setupWiFi();
+  wota.setupOTA();
   sta_tick.attach(10, staCheck);
 
   MDNS.begin(host);
@@ -849,11 +864,12 @@ void setup(void)
   updater.setup(&server);
   DBG_OUTPUT_PORT.println("setup wifiport...");
   wifiport.setup();
+  mqtt.setup();
 
-  // SERVER INIT
-  ArduinoOTA.setHostname(host);
-  ArduinoOTA.begin();
-  // list directory
+  // // SERVER INIT
+  // ArduinoOTA.setHostname(host);
+  // ArduinoOTA.begin();
+  // // list directory
   server.on("/list", HTTP_GET, handleFileList);
 
   server.on("/rtc/now", HTTP_GET, handleRTCNow);
@@ -1280,10 +1296,15 @@ void loop(void)
 {
   // note: ArduinoOTA.handle() calls MDNS.update();
   server.handleClient();
-  ArduinoOTA.handle();
+  // ArduinoOTA.handle();
+  status.currentMillis = millis();
+  wota.handleWiFi();
+  wota.handleOTA();
   // wifi port test
-  //TODO wifiport.addBuffer(testValue, 10000);
+  // TODO wifiport.addBuffer(testValue, 10000);
   wifiport.handle();
+  if (status.loops % 10 == 0)
+    mqtt.handle();
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
   {                        // have connections so stop logging
@@ -1322,4 +1343,16 @@ void loop(void)
       }
     }
   }
-*/}
+*/
+  mqtt.publishStatus(true);
+
+  if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
+  {
+    status.freeMem = esp_get_free_heap_size();
+    status.minFreeMem = esp_get_minimum_free_heap_size();
+    lastLoopReport = status.currentMillis;
+    Serial.println(status.loops);
+    status.loops = 0;
+  }
+  status.loops++;
+}
