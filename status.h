@@ -21,8 +21,8 @@ struct Status
   int sensors[SensorCount];
   int switches[SwitchCount];
 
-  char *inverterSend = "";
-  const char *response = ""; // response to above command
+  String inverterSend = "";
+  String response = ""; // response to above command
 };
 
 extern Status status;

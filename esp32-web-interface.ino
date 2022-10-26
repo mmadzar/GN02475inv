@@ -535,12 +535,8 @@ bool uart_readStartsWith(const char *val)
 
 static void sendCommand(const char *cmd, int len)
 {
-  DBG_OUTPUT_PORT.print("Sending... '");
-  DBG_OUTPUT_PORT.print(len);
-  DBG_OUTPUT_PORT.print("->");
-  DBG_OUTPUT_PORT.print(cmd);
-  DBG_OUTPUT_PORT.println("' to inverter");
-  // // Inverter.print("\n");
+  // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
+  //  // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
@@ -554,33 +550,33 @@ static void sendCommand(const char *cmd, int len)
   uart_readUntill('\n');
 }
 
-static const char *handleCmd(const char *cmd, int lencmd, int repeat)
+static String handleCmd(const char *cmd, int lencmd, int repeat)
 {
   String output;
   char buffer[255];
   size_t len = 0;
-  // if (!fastUart && fastUartAvailable)
-  // {
-  //   sendCommand("fastuart", 8);
-  //   if (uart_readStartsWith("OK"))
-  //   {
-  //     // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-  //     // Inverter.updateBaudRate(921600);
-  //     uart_set_baudrate(INVERTER_PORT, 921600);
-  //     fastUart = true;
-  //   }
-  //   else
-  //   {
-  //     fastUartAvailable = false;
-  //   }
-  // }
+  if (!fastUart && fastUartAvailable)
+  {
+    sendCommand("fastuart", 8);
+    if (uart_readStartsWith("OK"))
+    {
+      // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
+      // Inverter.updateBaudRate(921600);
+      uart_set_baudrate(INVERTER_PORT, 921600);
+      fastUart = true;
+    }
+    else
+    {
+      fastUartAvailable = false;
+    }
+  }
 
   sendCommand(cmd, lencmd);
   do
   {
     memset(buffer, 0, sizeof(buffer));
     // len = Inverter.readBytes(buffer, sizeof(buffer) - 1);
-    len = uart_read_bytes(UART_NUM_2, buffer, sizeof(buffer), UART_TIMEOUT);
+    len = uart_read_bytes(UART_NUM_2, buffer, String(buffer).length(), UART_TIMEOUT);
     if (len > 0)
       output.concat(buffer, len); // += buffer;
 
@@ -594,11 +590,14 @@ static const char *handleCmd(const char *cmd, int lencmd, int repeat)
     }
   } while (len > 0);
 
-  if (output.length() > 1)
+  if (output.length() > 0)
+  {
     DBG_OUTPUT_PORT.println(output);
+    DBG_OUTPUT_PORT.println(output.length());
+  }
   else
     output = "error";
-  return output.c_str();
+  return output;
 }
 
 static void handleCommand()
@@ -1320,12 +1319,11 @@ void loop(void)
   if (status.loops % 10 == 0)
     mqtt.handle();
 
-  if (strcmp(status.inverterSend, "") != 0)
+  if (!status.inverterSend.equals(""))
   {
-    status.response = handleCmd(status.inverterSend, sizeof(status.inverterSend), 0);
+    status.response = handleCmd(status.inverterSend.c_str(), status.inverterSend.length(), 0);
     status.inverterSend = "";
     mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
-    DBG_OUTPUT_PORT.println("sent");
   }
 
   /*

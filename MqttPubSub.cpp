@@ -27,7 +27,7 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
   {
     if (cmd == "inverter" && length > 0)
     {
-      strcat(status.inverterSend, (char *)message);
+      status.inverterSend=String((char *)message);
       //memccpy(status.inverterSend, (char *)message, 0, length);
       // status.inverterSend = (char *)message;
     }

@@ -1,14 +1,14 @@
 #ifndef APPCONFIG_H_
 #define APPCONFIG_H_
 
-#define HOST_NAME "GN02475inv1"
+#define HOST_NAME "GN02475inv"
 
 #include "../secrets.h"
 #include <stdint.h>
 #include <Arduino.h>
 #include <driver/gpio.h>
-#include "../include/configtypes/enums.h"
-#include "../include/configtypes/configtypes.h"
+#include "..\include\configtypes\enums.h"
+#include "..\include\configtypes\configtypes.h"
 
 struct PinsSettings
 {
