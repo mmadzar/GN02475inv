@@ -22,53 +22,18 @@ void MqttPubSub::setup()
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  char m[length];
-  for (size_t i = 0; i < length; i++)
-    m[i] = (char)message[i];
-
-  String msg = String(m);
   String const cmd = String(topic).substring(String(wifiSettings.hostname).length() + 4, String(topic).length());
   if (length > 0)
   {
     if (cmd == "inverter" && length > 0)
     {
-      // TODO
-      Serial.println("Inverter command... send...");
-      char msg[length + 1];
-      for (size_t cnt = 0; cnt < length + 1; cnt++)
-      {
-        // convert byte to its ascii representation
-        sprintf(&msg[cnt], "%C", message[cnt]);
-      }
+      strcat(status.inverterSend, (char *)message);
+      //memccpy(status.inverterSend, (char *)message, 0, length);
+      // status.inverterSend = (char *)message;
+    }
 
-      // convert hex representation of message to bytes
-      // Ex. 41 41 41 41 41 -> AAAAA
-      status.inverterSend = String(msg);
-      Serial.println(status.inverterSend);
-      // char tc[2] = {0x00, 0x00};
-      // for (size_t i = 0; i < (length) / 3; i++)
-      // {
-      //   tc[0] = char(message[i * 3]);
-      //   tc[1] = char(message[(i * 3) + 1]);
-      //   status.inverterSend[i] = strtol(tc, 0, 16);
-      //   Serial.println(status.inverterSend[i]);
-      // }
-    }
-    else
-    {
-      // for (size_t i = 0; i < SwitchCount; i++)
-      // {
-      //   SwitchConfig *sc = &pinsSettings.switches[i];
-      //   // find switch in settings and set status value by index
-      //   if (String(sc->name).equals(cmd))
-      //   {
-      //     status.switches[i] = msg.toInt();
-      //     break;
-      //   }
-      // }
-    }
-    // Serial.println(msg);
     // Serial.println(cmd);
+    // Serial.println(status.inverterSend);
     status.receivedCount++;
   }
 }
@@ -225,4 +190,9 @@ void MqttPubSub::sendMesssageToTopic(const char *topic, String message)
   char msg[255];
   message.toCharArray(msg, 255);
   client.publish(topic, msg);
+}
+
+void MqttPubSub::sendMesssageToTopic(const char *topic, const char *message)
+{
+  client.publish(topic, message);
 }

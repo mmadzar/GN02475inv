@@ -18,12 +18,13 @@ public:
   void setup();
   void handle();
   void sendMessage(String message);
+  void sendMesssageToTopic(const char *topic, const char *message);
   void sendMessage(String message, String channel);
   void sendMesssageToTopic(const char *topic, String message);
 
 private:
-  StaticJsonDocument<2048> doc;
-  char tempBuffer[2048];
+  StaticJsonDocument<1024> doc;
+  char tempBuffer[1024];
 
   long lastReconnectAttempt = 0;
   long lastOutChannelPublish = 0;

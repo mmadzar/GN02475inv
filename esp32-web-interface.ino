@@ -533,58 +533,49 @@ bool uart_readStartsWith(const char *val)
   return retVal;
 }
 
-static void sendCommand(String cmd)
+static void sendCommand(const char *cmd, int len)
 {
-  DBG_OUTPUT_PORT.println("Sending '" + cmd + "' to inverter");
-  // Inverter.print("\n");
+  DBG_OUTPUT_PORT.print("Sending... '");
+  DBG_OUTPUT_PORT.print(len);
+  DBG_OUTPUT_PORT.print("->");
+  DBG_OUTPUT_PORT.print(cmd);
+  DBG_OUTPUT_PORT.println("' to inverter");
+  // // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
   //   Inverter.read(); //flush all previous output
   uart_flush(INVERTER_PORT);
   // Inverter.print(cmd);
-  uart_write_bytes(INVERTER_PORT, cmd.c_str(), cmd.length());
+  uart_write_bytes(INVERTER_PORT, cmd, len);
   // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   // Inverter.readStringUntil('\n'); //consume echo
   uart_readUntill('\n');
 }
 
-static void handleCommand()
+static const char *handleCmd(const char *cmd, int lencmd, int repeat)
 {
-  const int cmdBufSize = 128;
-  if (!server.hasArg("cmd"))
-  {
-    server.send(500, "text/plain", "BAD ARGS");
-    return;
-  }
-
-  String cmd = server.arg("cmd").substring(0, cmdBufSize);
-  int repeat = 0;
+  String output;
   char buffer[255];
   size_t len = 0;
-  String output;
+  // if (!fastUart && fastUartAvailable)
+  // {
+  //   sendCommand("fastuart", 8);
+  //   if (uart_readStartsWith("OK"))
+  //   {
+  //     // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
+  //     // Inverter.updateBaudRate(921600);
+  //     uart_set_baudrate(INVERTER_PORT, 921600);
+  //     fastUart = true;
+  //   }
+  //   else
+  //   {
+  //     fastUartAvailable = false;
+  //   }
+  // }
 
-  if (server.hasArg("repeat"))
-    repeat = server.arg("repeat").toInt();
-
-  if (!fastUart && fastUartAvailable)
-  {
-    sendCommand("fastuart");
-    if (uart_readStartsWith("OK"))
-    {
-      // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-      // Inverter.updateBaudRate(921600);
-      uart_set_baudrate(INVERTER_PORT, 921600);
-      fastUart = true;
-    }
-    else
-    {
-      fastUartAvailable = false;
-    }
-  }
-
-  sendCommand(cmd);
+  sendCommand(cmd, lencmd);
   do
   {
     memset(buffer, 0, sizeof(buffer));
@@ -602,7 +593,30 @@ static void handleCommand()
       uart_read_bytes(UART_NUM_2, buffer, 1, UART_TIMEOUT);
     }
   } while (len > 0);
-  DBG_OUTPUT_PORT.println(output);
+
+  if (output.length() > 1)
+    DBG_OUTPUT_PORT.println(output);
+  else
+    output = "error";
+  return output.c_str();
+}
+
+static void handleCommand()
+{
+  const int cmdBufSize = 128;
+  if (!server.hasArg("cmd"))
+  {
+    server.send(500, "text/plain", "BAD ARGS");
+    return;
+  }
+  String prs = server.arg("cmd").substring(0, cmdBufSize);
+  const char *cmd = prs.c_str();
+  int repeat = 0;
+  String output;
+
+  if (server.hasArg("repeat"))
+    repeat = server.arg("repeat").toInt();
+  output = handleCmd(cmd, prs.length(), repeat);
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "text/json", output);
 }
@@ -651,7 +665,7 @@ static void handleUpdate()
   {
     // int c;
     char c;
-    sendCommand("reset");
+    sendCommand("reset", 5);
 
     if (fastUart)
     {
@@ -1237,9 +1251,9 @@ void binaryLoggingStart()
 {
   if (createNextSDFile())
   {
-    sendCommand(""); // flush out buffer in case just had power up
+    sendCommand("", 0); // flush out buffer in case just had power up
     delay(10);
-    sendCommand("binarylogging 1"); // send start logging command to inverter
+    sendCommand("binarylogging 1", 15); // send start logging command to inverter
     delayMicroseconds(200);
     if (uart_readStartsWith("OK"))
     {
@@ -1274,7 +1288,7 @@ void binaryLoggingStop()
   delay(100);
   uart_flush(INVERTER_PORT);
   // data should now have stopped so send command again and check response
-  sendCommand("binarylogging 0");
+  sendCommand("binarylogging 0", 15);
   if (uart_readStartsWith("OK"))
   {
     uart_set_baudrate(INVERTER_PORT, 115200);
@@ -1305,6 +1319,15 @@ void loop(void)
   wifiport.handle();
   if (status.loops % 10 == 0)
     mqtt.handle();
+
+  if (strcmp(status.inverterSend, "") != 0)
+  {
+    status.response = handleCmd(status.inverterSend, sizeof(status.inverterSend), 0);
+    status.inverterSend = "";
+    mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
+    DBG_OUTPUT_PORT.println("sent");
+  }
+
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
   {                        // have connections so stop logging
@@ -1351,7 +1374,7 @@ void loop(void)
     status.freeMem = esp_get_free_heap_size();
     status.minFreeMem = esp_get_minimum_free_heap_size();
     lastLoopReport = status.currentMillis;
-    Serial.println(status.loops);
+    DBG_OUTPUT_PORT.println(status.loops);
     status.loops = 0;
   }
   status.loops++;

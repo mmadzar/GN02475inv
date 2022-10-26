@@ -2,7 +2,7 @@
 #define WIFIOTA_H_
 
 #include <WiFi.h>
-#include <ArduinoOTA.h>
+// #include <ArduinoOTA.h>
 #include "appconfig.h"
 #include "status.h"
 

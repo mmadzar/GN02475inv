@@ -6,12 +6,10 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <esp_wifi.h>
-#include <esp_wpa2.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
 #include "WiFiOTA.h"
 
-int cnnAttempt = 0;
 WiFiMulti WiFiMulti;
 wifi_sta_list_t wifi_sta_list;
 tcpip_adapter_sta_list_t adapter_sta_list;
@@ -48,7 +46,7 @@ void WiFiOTA::handleWiFi()
 {
   wl_status_t ws;
   ws = WiFi.status();
-  if ((ws == WL_DISCONNECTED || ws == WL_CONNECTION_LOST || ws == WL_CONNECT_FAILED) && !connectionInProgress && status.currentMillis - lastReconnect > 5000)
+  if ((ws == WL_DISCONNECTED || ws == WL_CONNECTION_LOST) && !connectionInProgress && status.currentMillis - lastReconnect > 5000)
   {
     lastReconnect = status.currentMillis;
     connectionInProgress = true;
@@ -61,18 +59,7 @@ void WiFiOTA::handleWiFi()
     Serial.print("reconnecting wifi... timeout: ");
     Serial.println(ws);
     Serial.println(status.currentMillis - lastReconnect > 5000);
-    cnnAttempt++;
-    if (cnnAttempt % 2 == 0) // try to connect to office network every other time
-    {
-      cnnAttempt = 0;
-      esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)EAP_IDENTITY, strlen(EAP_IDENTITY));
-      esp_wifi_sta_wpa2_ent_set_username((uint8_t *)EAP_IDENTITY, strlen(EAP_IDENTITY));
-      esp_wifi_sta_wpa2_ent_set_password((uint8_t *)EAP_PASSWORD, strlen(EAP_PASSWORD));
-      esp_wifi_sta_wpa2_ent_enable();                 // set config settings to enable function
-      WiFi.begin("Mono_Wireless");                           // connect to wifi
-    }
-    else
-      ReconnectWiFi();
+    ReconnectWiFi();
   }
 }
 
@@ -122,7 +109,6 @@ void WiFiOTA::setupOTA()
 
 void WiFiOTA::handleOTA()
 {
-  // check for OTA every second
   if ((status.currentMillis - lastOTAmillis) > 1000)
   {
     ArduinoOTA.handle();
@@ -162,7 +148,7 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.println("Disconnected from WiFi access point");
     Serial.println(WiFi.SSID());
     digitalWrite(2, HIGH);
-    status.ipAddress = "255.255.255.255";
+    status.ipAddress = "none";
     status.gatewayAddress = "255.255.255.255";
     connectionInProgress = false;
     // WiFi.persistent(false);
@@ -184,7 +170,8 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     ipA = WiFi.localIP();
     sprintf(buff, "%d.%d.%d.%d", ipA[0], ipA[1], ipA[2], ipA[3]);
     status.ipAddress = buff;
-
+    Serial.println(status.ipAddress);
+    
     ipAG = WiFi.gatewayIP();
     sprintf(buff2, "%d.%d.%d.%d", ipAG[0], ipAG[1], ipAG[2], ipAG[3]);
     status.gatewayAddress = buff2;
@@ -198,18 +185,6 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.print(" RSSI: ");
     Serial.println(status.rssi);
     Serial.println("...");
-
-    // Set time
-    configTime(3 * 3600, 0, "pool.ntp.org");
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo))
-    {
-      Serial.println("Failed to obtain time");
-      return;
-    }
-    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S UTC");
-    Serial.println();
-
     break;
   case SYSTEM_EVENT_STA_LOST_IP:
     Serial.println("Lost IP address and IP address is reset to 0");
