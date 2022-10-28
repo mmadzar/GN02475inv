@@ -22,14 +22,23 @@ void MqttPubSub::setup()
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  String const cmd = String(topic).substring(String(wifiSettings.hostname).length() + 4, String(topic).length());
+  char msg[length];
+  for (size_t i = 0; i < length; i++)
+    msg[i] = (char)message[i];
+  Serial.print("1...");
+  Serial.println(msg);
+  String m(msg);
+  Serial.print("2...");
+  Serial.println(m);
+  String t = String(topic);
+  String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());
   if (length > 0)
   {
-    if (cmd == "inverter" && length > 0)
+    if (cmd.equals("inverter") && length > 0)
     {
-      status.inverterSend=String((char *)message);
-      //memccpy(status.inverterSend, (char *)message, 0, length);
-      // status.inverterSend = (char *)message;
+      status.inverterSend = m.c_str();
+      Serial.print("3...");
+      Serial.println(status.inverterSend);
     }
 
     // Serial.println(cmd);

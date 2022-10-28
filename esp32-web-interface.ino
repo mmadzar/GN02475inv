@@ -533,31 +533,33 @@ bool uart_readStartsWith(const char *val)
   return retVal;
 }
 
-static void sendCommand(const char *cmd, int len)
+static void sendCommand(String cmd)
 {
   // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
   //  // Inverter.print("\n");
+  wifiport.addBuffer(cmd.c_str(), cmd.length());
+  Serial.println(cmd);
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
   //   Inverter.read(); //flush all previous output
   uart_flush(INVERTER_PORT);
   // Inverter.print(cmd);
-  uart_write_bytes(INVERTER_PORT, cmd, len);
+  uart_write_bytes(INVERTER_PORT, cmd.c_str(), cmd.length());
   // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   // Inverter.readStringUntil('\n'); //consume echo
   uart_readUntill('\n');
 }
 
-static String handleCmd(const char *cmd, int lencmd, int repeat)
+static String handleCmd(String cmd, int repeat)
 {
   String output;
   char buffer[255];
   size_t len = 0;
   if (!fastUart && fastUartAvailable)
   {
-    sendCommand("fastuart", 8);
+    sendCommand("fastuart");
     if (uart_readStartsWith("OK"))
     {
       // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
@@ -571,7 +573,7 @@ static String handleCmd(const char *cmd, int lencmd, int repeat)
     }
   }
 
-  sendCommand(cmd, lencmd);
+  sendCommand(cmd);
   do
   {
     memset(buffer, 0, sizeof(buffer));
@@ -590,13 +592,12 @@ static String handleCmd(const char *cmd, int lencmd, int repeat)
     }
   } while (len > 0);
 
-  if (output.length() > 0)
-  {
-    DBG_OUTPUT_PORT.println(output);
-    DBG_OUTPUT_PORT.println(output.length());
-  }
-  else
+  if (output.length() == 0)
     output = "error";
+
+  DBG_OUTPUT_PORT.println(output);
+  wifiport.addBuffer(output.c_str(), output.length());
+
   return output;
 }
 
@@ -608,14 +609,13 @@ static void handleCommand()
     server.send(500, "text/plain", "BAD ARGS");
     return;
   }
-  String prs = server.arg("cmd").substring(0, cmdBufSize);
-  const char *cmd = prs.c_str();
+  String cmd = server.arg("cmd").substring(0, cmdBufSize);
   int repeat = 0;
   String output;
 
   if (server.hasArg("repeat"))
     repeat = server.arg("repeat").toInt();
-  output = handleCmd(cmd, prs.length(), repeat);
+  output = handleCmd(cmd, repeat);
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "text/json", output);
 }
@@ -664,7 +664,7 @@ static void handleUpdate()
   {
     // int c;
     char c;
-    sendCommand("reset", 5);
+    sendCommand("reset");
 
     if (fastUart)
     {
@@ -1250,9 +1250,9 @@ void binaryLoggingStart()
 {
   if (createNextSDFile())
   {
-    sendCommand("", 0); // flush out buffer in case just had power up
+    sendCommand(""); // flush out buffer in case just had power up
     delay(10);
-    sendCommand("binarylogging 1", 15); // send start logging command to inverter
+    sendCommand("binarylogging 1"); // send start logging command to inverter
     delayMicroseconds(200);
     if (uart_readStartsWith("OK"))
     {
@@ -1287,7 +1287,7 @@ void binaryLoggingStop()
   delay(100);
   uart_flush(INVERTER_PORT);
   // data should now have stopped so send command again and check response
-  sendCommand("binarylogging 0", 15);
+  sendCommand("binarylogging 0");
   if (uart_readStartsWith("OK"))
   {
     uart_set_baudrate(INVERTER_PORT, 115200);
@@ -1319,9 +1319,11 @@ void loop(void)
   if (status.loops % 10 == 0)
     mqtt.handle();
 
-  if (!status.inverterSend.equals(""))
+  if (status.inverterSend != "")
   {
-    status.response = handleCmd(status.inverterSend.c_str(), status.inverterSend.length(), 0);
+    Serial.println(status.inverterSend);
+    String ts(status.inverterSend);
+    status.response = handleCmd(ts, 0).c_str();
     status.inverterSend = "";
     mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
   }
