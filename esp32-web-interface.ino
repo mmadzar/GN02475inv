@@ -597,7 +597,6 @@ static String handleCmd(String cmd, int repeat)
 
   DBG_OUTPUT_PORT.println(output);
   wifiport.addBuffer(output.c_str(), output.length());
-
   return output;
 }
 
@@ -1316,17 +1315,18 @@ void loop(void)
   // wifi port test
   // TODO wifiport.addBuffer(testValue, 10000);
   wifiport.handle();
-  if (status.loops % 10 == 0)
-    mqtt.handle();
 
-  if (status.inverterSend != "")
+  if (status.inverterSend[0] != 0x00 && !String(status.inverterSend).equals(""))
   {
-    Serial.println(status.inverterSend);
-    String ts(status.inverterSend);
-    status.response = handleCmd(ts, 0).c_str();
-    status.inverterSend = "";
+    String r = handleCmd(status.inverterSend, 0);
+    r.concat("\n");
+    status.response = r.c_str();
+    status.inverterSend[0] = 0x00;
     mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
   }
+
+  if (status.loops % 10 == 0)
+    mqtt.handle();
 
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))

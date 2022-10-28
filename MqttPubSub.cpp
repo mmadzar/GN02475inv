@@ -22,27 +22,21 @@ void MqttPubSub::setup()
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  char msg[length];
+  char msg[length + 1];
   for (size_t i = 0; i < length; i++)
+  {
     msg[i] = (char)message[i];
-  Serial.print("1...");
-  Serial.println(msg);
-  String m(msg);
-  Serial.print("2...");
-  Serial.println(m);
+  }
+  msg[length] = 0x00; //important to add null termination to string! messes string value if ommited
+
   String t = String(topic);
   String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());
   if (length > 0)
   {
-    if (cmd.equals("inverter") && length > 0)
+    if (cmd.equals("inverter"))
     {
-      status.inverterSend = m.c_str();
-      Serial.print("3...");
-      Serial.println(status.inverterSend);
+      strcpy(status.inverterSend, msg);
     }
-
-    // Serial.println(cmd);
-    // Serial.println(status.inverterSend);
     status.receivedCount++;
   }
 }

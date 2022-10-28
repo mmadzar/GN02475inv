@@ -28,8 +28,10 @@ void WiFiOTA::setupWiFi()
   esp_wifi_set_storage(WIFI_STORAGE_RAM);
   for (int i = 0; i < wifiSettings.APsCount; i++)
   {
-    WiFiMulti.addAP(wifiSettings.APs[i][0], wifiSettings.APs[i][1]);
+    Serial.println(wifiSettings.APs[i][0]);
+    WiFiMulti.addAP(wifiSettings.APs[i][0], wifiSettings.APs[i][1], wifiSettings.APs[i][2]);
   }
+
   Serial.print("Conecting to WiFi... ");
   WiFi.disconnect(false, false);
 
@@ -137,6 +139,7 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     break;
   case SYSTEM_EVENT_STA_STOP:
     Serial.println("WiFi clients stopped");
+    WiFiMulti.run();
     Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_CONNECTED:
