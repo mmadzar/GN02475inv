@@ -2,3 +2,4 @@
 .pio/
 platformio-local-override.ini
 .vscode
+esp32-web-interface.ino.cpp

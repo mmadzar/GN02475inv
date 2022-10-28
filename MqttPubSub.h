@@ -12,6 +12,7 @@ class MqttPubSub
 {
 public:
   PubSubClient client;
+  PinsSettings pinsSettings;
   int lastMillis = 0;
   MqttPubSub();
   void publishStatus(bool waitForInterval);

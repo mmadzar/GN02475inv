@@ -108,14 +108,17 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
     root["ipAddress"] = status.ipAddress;
     root["gateway"] = status.gatewayAddress;
     root["location"] = "car";
+    root["SSID"] = status.SSID;
     root["RSSI"] = WiFi.RSSI(); // status.rssi;
     root["receivedCount"] = status.receivedCount;
 
     JsonObject sensors = root.createNestedObject("sensors");
-    for (size_t i = 0; i < SensorCount; i++)
-    {
-      sensors[pinsSettings.sensors[i].name] = status.sensors[i];
-    }
+    sensors["tempm1"]=status.tempm1;
+    sensors["tempm2"]=status.tempm1;
+    // for (size_t i = 0; i < SensorCount; i++)
+    // {
+    //   sensors[pinsSettings.sensors[i].name] = status.sensors[i];
+    // }
 
     serializeJson(doc, tempBuffer);
     client.publish(channelStatus, tempBuffer);

@@ -1,14 +1,12 @@
 #ifndef APPCONFIG_H_
 #define APPCONFIG_H_
 
-#define HOST_NAME "GN02475inv1"
+#define HOST_NAME "GN02475inv"
 
 #include "../secrets.h"
 #include <stdint.h>
 #include <Arduino.h>
-#include <driver/gpio.h>
-#include "../include/configtypes/enums.h"
-#include "../include/configtypes/configtypes.h"
+// #include <driver/gpio.h>
 
 struct PinsSettings
 {
@@ -17,40 +15,40 @@ struct PinsSettings
   const gpio_num_t can0_tx = (gpio_num_t)22; // can0 transciever tx line
 
 #define SwitchCount 0
-  SwitchConfig switches[SwitchCount] = {};
+  //SwitchConfig switches[SwitchCount] = {};
 
 #define SensorCount 0
-  SensorConfig sensors[SensorCount] = {};
-  //     {devicet::adc_motor1, "tempm1", 32, sensort::adc}, // motor temp sensor 1
-  //     {devicet::adc_motor2, "tempm2", 33, sensort::adc}  // motor temp sensor 2
+  //SensorConfig sensors[SensorCount] = {};
+  //     {devicet::adc_motor1, "tempm1", (u_int)32, sensort::adc}, // motor temp sensor 1
+  //     {devicet::adc_motor2, "tempm2", (u_int)33, sensort::adc}  // motor temp sensor 2
   // };
 
-  int getSensorIndex(const char *name)
-  {
-    for (size_t i = 0; i < SensorCount; i++)
-    {
-      if (strcmp(sensors[i].name, name) == 0)
-        return i;
-    }
-  }
+  // int getSensorIndex(const char *name)
+  // {
+  //   for (size_t i = 0; i < SensorCount; i++)
+  //   {
+  //     if (strcmp(sensors[i].name, name) == 0)
+  //       return i;
+  //   }
+  // }
 
-  int getSensorIndex(devicet device)
-  {
-    for (size_t i = 0; i < SensorCount; i++)
-    {
-      if (sensors[i].device == device)
-        return i;
-    }
-  }
+  // int getSensorIndex(devicet device)
+  // {
+  //   for (size_t i = 0; i < SensorCount; i++)
+  //   {
+  //     if (sensors[i].device == device)
+  //       return i;
+  //   }
+  // }
 
-  int getSwitchIndex(devicet device)
-  {
-    for (size_t i = 0; i < SwitchCount; i++)
-    {
-      if (switches[i].device == device)
-        return i;
-    }
-  }
+  // int getSwitchIndex(devicet device)
+  // {
+  //   for (size_t i = 0; i < SwitchCount; i++)
+  //   {
+  //     if (switches[i].device == device)
+  //       return i;
+  //   }
+  // }
 };
 
 struct Intervals

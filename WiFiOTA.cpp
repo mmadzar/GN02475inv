@@ -174,17 +174,18 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     sprintf(buff, "%d.%d.%d.%d", ipA[0], ipA[1], ipA[2], ipA[3]);
     status.ipAddress = buff;
     Serial.println(status.ipAddress);
-    
+
     ipAG = WiFi.gatewayIP();
     sprintf(buff2, "%d.%d.%d.%d", ipAG[0], ipAG[1], ipAG[2], ipAG[3]);
     status.gatewayAddress = buff2;
     Serial.print(status.ipAddress);
     Serial.print(" gateway: ");
     Serial.println(status.gatewayAddress);
+    status.SSID = WiFi.SSID().c_str();
     digitalWrite(2, LOW);
     status.rssi = WiFi.RSSI();
     Serial.print("SSID: ");
-    Serial.print(WiFi.SSID());
+    Serial.print(status.SSID);
     Serial.print(" RSSI: ");
     Serial.println(status.rssi);
     Serial.println("...");

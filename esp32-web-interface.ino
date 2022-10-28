@@ -41,6 +41,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
@@ -60,6 +61,7 @@
 #include "WiFiOTA.h"
 #include "MqttPubSub.h"
 #include "Bytes2WiFi.h"
+#include "TempSensorNTC.h"
 
 #define DBG_OUTPUT_PORT Serial
 #define INVERTER_PORT UART_NUM_2
@@ -85,12 +87,13 @@ char uartMessBuff[UART_MESSBUF_SIZE];
 long loops = 0;
 long lastLoopReport = 0;
 Status status;
-PinsSettings pins;
+// PinsSettings pinsSettings;
 Intervals intervals;
 WiFiSettings wifiSettings;
 MqttSettings mqttSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
+TempSensorNTC temps;
 
 WebServer server(80);
 HTTPUpdateServer updater;
@@ -538,7 +541,7 @@ static void sendCommand(String cmd)
   // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
   //  // Inverter.print("\n");
   wifiport.addBuffer(cmd.c_str(), cmd.length());
-  Serial.println(cmd);
+  DBG_OUTPUT_PORT.println(cmd);
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
@@ -869,6 +872,7 @@ void setup(void)
 
   wota.setupWiFi();
   wota.setupOTA();
+  temps.setup();
   sta_tick.attach(10, staCheck);
 
   MDNS.begin(host);
@@ -1324,7 +1328,11 @@ void loop(void)
     status.inverterSend[0] = 0x00;
     mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
   }
-
+  if (temps.handle())
+  {
+    mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
+    mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
+  }
   if (status.loops % 10 == 0)
     mqtt.handle();
 
