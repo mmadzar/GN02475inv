@@ -15,17 +15,17 @@ void MqttPubSub::setup()
   strcat(channelOut, "/out");
 
   client.setClient(espClient);
-  client.setBufferSize(1024);
+  client.setBufferSize(512);
   client.setKeepAlive(30);
   client.setCallback(callback);
 }
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  char msg[length + 1];
+  char msg[length];
   for (size_t i = 0; i < length; i++)
     msg[i] = (char)message[i];
-  msg[length] = 0x00; // important to add null termination to string! messes string value if ommited
+  //msg[length] = 0x0a; // important to add termination to string! messes string value if ommited
 
   String t = String(topic);
   String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());

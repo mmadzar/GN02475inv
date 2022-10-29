@@ -24,8 +24,8 @@ public:
   void sendMesssageToTopic(const char *topic, String message);
 
 private:
-  StaticJsonDocument<1024> doc;
-  char tempBuffer[1024];
+  StaticJsonDocument<512> doc;
+  char tempBuffer[512];
 
   long lastReconnectAttempt = 0;
   long lastOutChannelPublish = 0;

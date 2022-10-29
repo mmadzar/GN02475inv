@@ -23,7 +23,7 @@ struct Status
   int sensors[SensorCount];
   int switches[SwitchCount];
 
-  char inverterSend[512] = {};
+  char inverterSend[128] = {};
   const char *response = ""; // response to above command
 };
 

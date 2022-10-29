@@ -17,7 +17,7 @@ public:
     void addBuffer(const char *buffer, size_t size);
 
 private:
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 512
     byte content[BUFFER_SIZE];
     int position = 0;
     uint32_t lastMicros;
