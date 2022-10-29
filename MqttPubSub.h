@@ -27,17 +27,13 @@ private:
   StaticJsonDocument<512> doc;
   char tempBuffer[512];
 
-  long lastReconnectAttempt = 0;
-  long lastOutChannelPublish = 0;
-  int lastVacuumValue = 0;
-  long reconnectAttemptsFailed = 0;
+  long lastReconnectAttempt = -10000;
   char channelStatus[50];
   char channelRaw[50];
   char channelIn[50];
   char channelOut[50];
   int idx1;
   int idx2;
-  int lastMillisDomoticz = 0;
   long bytesCount = 0;
 
   const char *hostname;

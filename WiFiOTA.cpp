@@ -48,6 +48,7 @@ void WiFiOTA::handleWiFi()
 {
   wl_status_t ws;
   ws = WiFi.status();
+  //cleanup this
   if ((ws == WL_DISCONNECTED || ws == WL_CONNECTION_LOST) && !connectionInProgress && status.currentMillis - lastReconnect > 5000)
   {
     lastReconnect = status.currentMillis;
@@ -102,11 +103,6 @@ void WiFiOTA::setupOTA()
                    Serial.println("End Failed"); });
 
   ArduinoOTA.begin();
-
-  // //blink for success
-  // digitalWrite(pinsSett.led, HIGH);
-  // delay(100);
-  // digitalWrite(pinsSett.led, LOW);
 }
 
 void WiFiOTA::handleOTA()
@@ -155,15 +151,6 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     status.gatewayAddress = "255.255.255.255";
     status.SSID = "";
     connectionInProgress = false;
-    // WiFi.persistent(false);
-    // WiFi.disconnect(false, false);
-    // WiFi.persistent(false);
-    // for (int i = 0; i < wifiSettings.APsCount; i++)
-    // {
-    //   WiFiMulti.addAP(wifiSettings.APs[i][0], wifiSettings.APs[i][1]);
-    // }
-    // //Serial.println(wifiSett.APs[0][0]);
-    // ReconnectWiFi();
     break;
   case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
     Serial.println("Authentication mode of access point has changed");

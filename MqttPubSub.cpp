@@ -22,10 +22,10 @@ void MqttPubSub::setup()
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  char msg[length];
+  char msg[length + 1];
   for (size_t i = 0; i < length; i++)
     msg[i] = (char)message[i];
-  //msg[length] = 0x0a; // important to add termination to string! messes string value if ommited
+  msg[length] = 0x0a; // important to add termination to string! messes string value if ommited
 
   String t = String(topic);
   String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());
@@ -34,7 +34,9 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
     if (cmd == "restart" && String(msg).toInt() == 1)
       ESP.restart();
     if (cmd.equals("inverter"))
-      strcpy(status.inverterSend, msg);
+    {
+      String(msg).toCharArray(status.inverterSend, length + 1);
+    }
     status.receivedCount++;
   }
 }
@@ -143,19 +145,7 @@ void MqttPubSub::handle()
         if (reconnect())
         {
           lastReconnectAttempt = 0;
-          reconnectAttemptsFailed = 0;
           Serial.print("mqtt connected."); // Expired waiting on 0inactive connection...");
-        }
-        else
-        {
-          reconnectAttemptsFailed++;
-          // if (reconnectAttemptsFailed > 5)
-          // { //no MQTT broker available, try with other WiFi network
-          //   //wait 30 secs before restarting
-          //   //ESP.restart();
-          Serial.print("No MQTT broker available. ");
-          Serial.println(reconnectAttemptsFailed);
-          // }
         }
       }
     }

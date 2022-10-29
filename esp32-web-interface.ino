@@ -41,12 +41,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <HTTPUpdateServer.h>
 #include <ESPmDNS.h>
+#include <ArduinoOTA.h>
 #include <FS.h>
 #include <Ticker.h>
 
@@ -77,29 +77,28 @@
 
 #define MAX_SD_FILES 200
 
+#define LOG_DELAY_VAL 10000
+
 // HardwareSerial Inverter(INVERTER_PORT);
 
-const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
-
-long loops = 0;
-long lastLoopReport = 0;
-Status status;
-// PinsSettings pinsSettings;
-Intervals intervals;
-WiFiSettings wifiSettings;
-MqttSettings mqttSettings;
-WiFiOTA wota;
-MqttPubSub mqtt;
-TempSensorNTC temps;
 
 WebServer server(80);
 HTTPUpdateServer updater;
 // holds the current upload
 File fsUploadFile;
 Ticker sta_tick;
+
+long lastLoopReport = 0;
+Status status;
+Intervals intervals;
+WiFiSettings wifiSettings;
+MqttSettings mqttSettings;
+WiFiOTA wota;
+MqttPubSub mqtt;
+TempSensorNTC temps;
 
 // SWD over ESP8266
 /*
@@ -538,9 +537,9 @@ bool uart_readStartsWith(const char *val)
 
 static void sendCommand(String cmd)
 {
-  // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
-  //  // Inverter.print("\n");
+  DBG_OUTPUT_PORT.println("Sending '" + cmd + "' to inverter");
   wifiport.addBuffer(cmd.c_str(), cmd.length());
+  // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
@@ -554,35 +553,60 @@ static void sendCommand(String cmd)
   uart_readUntill('\n');
 }
 
-static String handleCmd(String cmd, int repeat)
+static void handleCommand()
 {
-  String output;
+  const int cmdBufSize = 128;
+  String cmd;
+  int repeat = 0;
   char buffer[255];
   size_t len = 0;
-  // if (!fastUart && fastUartAvailable)
-  // {
-  //   sendCommand("fastuart");
-  //   if (uart_readStartsWith("OK"))
-  //   {
-  //     // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-  //     // Inverter.updateBaudRate(921600);
-  //     uart_set_baudrate(INVERTER_PORT, 921600);
-  //     fastUart = true;
-  //   }
-  //   else
-  //   {
-  //     fastUartAvailable = false;
-  //   }
-  // }
+  String output;
+  bool mqttCmd = !(status.inverterSend[0] == 0x00 || status.inverterSend == "");
+  if (!mqttCmd)
+  {
+    if (!server.hasArg("cmd"))
+    {
+      server.send(500, "text/plain", "BAD ARGS");
+      return;
+    }
+
+    cmd = server.arg("cmd").substring(0, cmdBufSize);
+    if (server.hasArg("repeat"))
+      repeat = server.arg("repeat").toInt();
+
+    if (!fastUart && fastUartAvailable)
+    {
+      sendCommand("fastuart");
+      if (uart_readStartsWith("OK"))
+      {
+        // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
+        // Inverter.updateBaudRate(921600);
+        uart_set_baudrate(INVERTER_PORT, 921600);
+        fastUart = true;
+      }
+      else
+      {
+        fastUartAvailable = false;
+      }
+    }
+  }
+  else
+  {
+    cmd = String(status.inverterSend);
+  }
 
   sendCommand(cmd);
   do
   {
     memset(buffer, 0, sizeof(buffer));
     // len = Inverter.readBytes(buffer, sizeof(buffer) - 1);
-    len = uart_read_bytes(UART_NUM_2, buffer, String(buffer).length(), UART_TIMEOUT);
+    len = uart_read_bytes(UART_NUM_2, buffer, sizeof(buffer), UART_TIMEOUT);
     if (len > 0)
       output.concat(buffer, len); // += buffer;
+
+    // add to debug wifi port
+    wifiport.addBuffer(buffer, len);
+    wifiport.handle();
 
     if (repeat)
     {
@@ -593,32 +617,16 @@ static String handleCmd(String cmd, int repeat)
       uart_read_bytes(UART_NUM_2, buffer, 1, UART_TIMEOUT);
     }
   } while (len > 0);
-
-  // if (output.length() == 0)
-  //   output = "error";
-
-  //DBG_OUTPUT_PORT.println(output);
-  //wifiport.addBuffer(output.c_str(), output.length());
-  return output;
-}
-
-static void handleCommand()
-{
-  const int cmdBufSize = 128;
-  if (!server.hasArg("cmd"))
+  // DBG_OUTPUT_PORT.println(output);
+  if (!mqttCmd)
   {
-    server.send(500, "text/plain", "BAD ARGS");
-    return;
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200, "text/json", output);
   }
-  String cmd = server.arg("cmd").substring(0, cmdBufSize);
-  int repeat = 0;
-  String outp;
-
-  if (server.hasArg("repeat"))
-    repeat = server.arg("repeat").toInt();
-  outp = handleCmd(cmd, repeat);
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "text/json", outp);
+  else
+  {
+    mqtt.sendMessage(output.c_str(), String(HOST_NAME) + "/out/response");
+  }
 }
 
 static uint32_t crc32_word(uint32_t Crc, uint32_t Data)
@@ -868,23 +876,24 @@ void setup(void)
   // WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.setSleep(false);
   WiFi.setTxPower(WIFI_POWER_19_5dBm); // 25); //dbm
+  // WiFi.begin();
+  sta_tick.attach(10, staCheck);
 
   wota.setupWiFi();
   wota.setupOTA();
   temps.setup();
-  sta_tick.attach(10, staCheck);
-
-  MDNS.begin(host);
-
-  updater.setup(&server);
-  DBG_OUTPUT_PORT.println("setup wifiport...");
   wifiport.setup();
   mqtt.setup();
 
-  // // SERVER INIT
+  MDNS.begin(HOST_NAME);
+
+  updater.setup(&server);
+
+  // SERVER INIT
   // ArduinoOTA.setHostname(host);
   // ArduinoOTA.begin();
-  // // list directory
+
+  // list directory
   server.on("/list", HTTP_GET, handleFileList);
 
   server.on("/rtc/now", HTTP_GET, handleRTCNow);
@@ -1110,7 +1119,7 @@ void setup(void)
         addr = 0x08001000;
         addrEnd = 0x0801ffff;
       }
-
+      
       server.sendHeader("Content-Disposition", "attachment; filename = \"" + filename + "\"");
       server.setContentLength(addrEnd - addr + 1); //CONTENT_LENGTH_UNKNOWN
       server.send(200, "application/octet-stream", "");
@@ -1123,7 +1132,7 @@ void setup(void)
         //uint8_t* buff;
         //swd.binDump(addrNext, buff);
         //server.sendContent(String((char *)buff));
-
+        
         uint8_t byte;
         swd.memLoadByte(addrNext, byte);
         server.sendContent(String(byte));
@@ -1180,7 +1189,7 @@ void setup(void)
             }
 
             //digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-
+            
             uint8_t PAGE_SIZE = 6; //webserver max chunks
             for (uint8_t p = 0; p < PAGE_SIZE; p++)
             {
@@ -1210,7 +1219,7 @@ void setup(void)
             }
             swd.flashloaderRUN(addrNext, addrBuffer);
             delay(400); //Must wait for flashloader to finish
-
+ 
             addrBuffer = 0x00000000;
             addrNext = addrIndex;
           }
@@ -1312,28 +1321,24 @@ void loop(void)
   // note: ArduinoOTA.handle() calls MDNS.update();
   server.handleClient();
   // ArduinoOTA.handle();
+
   status.currentMillis = millis();
   wota.handleWiFi();
   wota.handleOTA();
   wifiport.handle();
+  mqtt.handle();
 
-  if (status.inverterSend[0] != 0x00 && !String(status.inverterSend).equals(""))
+  if (status.inverterSend != "" && status.inverterSend[0] != 0x00)
   {
-    String r = handleCmd(status.inverterSend, 0);
-    r.concat("\n");
-    status.response = r.c_str();
+    handleCommand();
     status.inverterSend[0] = 0x00;
-    mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
   }
   if (temps.handle())
   {
     mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
     mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
   }
-  if (status.loops % 10 == 0)
-    mqtt.handle();
 
-  /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
   {                        // have connections so stop logging
     startLogAttempt = 0;   // restart log attempts when next disconnected
@@ -1364,14 +1369,14 @@ void loop(void)
     }
     else // not active so start
     {
-      if (haveSDCard && fastLoggingEnabled && (startLogAttempt < 3))
+      if (haveSDCard && fastLoggingEnabled && (startLogAttempt < 3) && (millis() > LOG_DELAY_VAL))
       {
         startLogAttempt++;
         binaryLoggingStart();
       }
     }
   }
-*/
+
   mqtt.publishStatus(true);
 
   if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
