@@ -153,6 +153,7 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     digitalWrite(2, HIGH);
     status.ipAddress = "none";
     status.gatewayAddress = "255.255.255.255";
+    status.SSID = "";
     connectionInProgress = false;
     // WiFi.persistent(false);
     // WiFi.disconnect(false, false);
@@ -181,7 +182,7 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.print(status.ipAddress);
     Serial.print(" gateway: ");
     Serial.println(status.gatewayAddress);
-    status.SSID = WiFi.SSID().c_str();
+    status.SSID = WiFi.SSID();
     digitalWrite(2, LOW);
     status.rssi = WiFi.RSSI();
     Serial.print("SSID: ");

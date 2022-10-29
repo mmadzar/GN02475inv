@@ -560,21 +560,21 @@ static String handleCmd(String cmd, int repeat)
   String output;
   char buffer[255];
   size_t len = 0;
-  if (!fastUart && fastUartAvailable)
-  {
-    sendCommand("fastuart");
-    if (uart_readStartsWith("OK"))
-    {
-      // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-      // Inverter.updateBaudRate(921600);
-      uart_set_baudrate(INVERTER_PORT, 921600);
-      fastUart = true;
-    }
-    else
-    {
-      fastUartAvailable = false;
-    }
-  }
+  // if (!fastUart && fastUartAvailable)
+  // {
+  //   sendCommand("fastuart");
+  //   if (uart_readStartsWith("OK"))
+  //   {
+  //     // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
+  //     // Inverter.updateBaudRate(921600);
+  //     uart_set_baudrate(INVERTER_PORT, 921600);
+  //     fastUart = true;
+  //   }
+  //   else
+  //   {
+  //     fastUartAvailable = false;
+  //   }
+  // }
 
   sendCommand(cmd);
   do
@@ -1111,7 +1111,7 @@ void setup(void)
         addr = 0x08001000;
         addrEnd = 0x0801ffff;
       }
-      
+
       server.sendHeader("Content-Disposition", "attachment; filename = \"" + filename + "\"");
       server.setContentLength(addrEnd - addr + 1); //CONTENT_LENGTH_UNKNOWN
       server.send(200, "application/octet-stream", "");
@@ -1124,7 +1124,7 @@ void setup(void)
         //uint8_t* buff;
         //swd.binDump(addrNext, buff);
         //server.sendContent(String((char *)buff));
-        
+
         uint8_t byte;
         swd.memLoadByte(addrNext, byte);
         server.sendContent(String(byte));
@@ -1181,7 +1181,7 @@ void setup(void)
             }
 
             //digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-            
+
             uint8_t PAGE_SIZE = 6; //webserver max chunks
             for (uint8_t p = 0; p < PAGE_SIZE; p++)
             {
@@ -1211,7 +1211,7 @@ void setup(void)
             }
             swd.flashloaderRUN(addrNext, addrBuffer);
             delay(400); //Must wait for flashloader to finish
- 
+
             addrBuffer = 0x00000000;
             addrNext = addrIndex;
           }
@@ -1320,21 +1320,21 @@ void loop(void)
   // TODO wifiport.addBuffer(testValue, 10000);
   wifiport.handle();
 
-  if (status.inverterSend[0] != 0x00 && !String(status.inverterSend).equals(""))
-  {
-    String r = handleCmd(status.inverterSend, 0);
-    r.concat("\n");
-    status.response = r.c_str();
-    status.inverterSend[0] = 0x00;
-    mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
-  }
-  if (temps.handle())
-  {
-    mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
-    mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
-  }
-  if (status.loops % 10 == 0)
-    mqtt.handle();
+  // if (status.inverterSend[0] != 0x00 && !String(status.inverterSend).equals(""))
+  // {
+  //   String r = handleCmd(status.inverterSend, 0);
+  //   r.concat("\n");
+  //   status.response = r.c_str();
+  //   status.inverterSend[0] = 0x00;
+  //   mqtt.sendMessage(status.response, String(HOST_NAME) + "/out/response");
+  // }
+  // if (temps.handle())
+  // {
+  //   mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
+  //   mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
+  // }
+  // if (status.loops % 10 == 0)
+  //   mqtt.handle();
 
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))

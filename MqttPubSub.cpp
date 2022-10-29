@@ -24,58 +24,59 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
   char msg[length + 1];
   for (size_t i = 0; i < length; i++)
-  {
     msg[i] = (char)message[i];
-  }
-  msg[length] = 0x00; //important to add null termination to string! messes string value if ommited
+  msg[length] = 0x00; // important to add null termination to string! messes string value if ommited
 
   String t = String(topic);
   String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());
   if (length > 0)
   {
+    if (cmd == "restart" && String(msg).toInt() == 1)
+      ESP.restart();
     if (cmd.equals("inverter"))
-    {
       strcpy(status.inverterSend, msg);
-    }
     status.receivedCount++;
   }
 }
 
 bool MqttPubSub::reconnect()
 {
-  if (WiFi.SSID() != currentMqttSettings[0])
+  if (status.SSID != "")
   {
-    for (size_t i = 0; i < wifiSettings.APsCount; i++)
+    if (status.SSID != currentMqttSettings[0])
     {
-      if (WiFi.SSID() == mqttSettings.Servers[i][0])
+      for (size_t i = 0; i < wifiSettings.APsCount; i++)
       {
-        currentMqttSettings[0] = mqttSettings.Servers[i][0];
-        currentMqttSettings[1] = mqttSettings.Servers[i][1];
-        if (currentMqttSettings[1] == "gateway")
-          currentMqttSettings[1] = status.gatewayAddress;
-        currentMqttSettings[2] = mqttSettings.Servers[i][2];
-        currentMqttSettings[3] = mqttSettings.Servers[i][3];
-        currentMqttSettings[4] = mqttSettings.Servers[i][4];
-        break;
+        if (status.SSID.equals(mqttSettings.Servers[i][0]))
+        {
+          currentMqttSettings[0] = mqttSettings.Servers[i][0];
+          currentMqttSettings[1] = mqttSettings.Servers[i][1];
+          if (currentMqttSettings[1] == "gateway")
+            currentMqttSettings[1] = status.gatewayAddress;
+          currentMqttSettings[2] = mqttSettings.Servers[i][2];
+          currentMqttSettings[3] = mqttSettings.Servers[i][3];
+          currentMqttSettings[4] = mqttSettings.Servers[i][4];
+          break;
+        }
       }
     }
-  }
 
-  if (currentMqttSettings[1] != "")
-  {
-    Serial.println("Reconnecting to MQTT...");
-    digitalWrite(2, HIGH);
-    // Attempt to connect
-    client.setServer(currentMqttSettings[1], atoi(currentMqttSettings[2]));
-    if (connect(hostname, currentMqttSettings[3], currentMqttSettings[4]))
+    if (currentMqttSettings[1] != "")
     {
-      Serial.println("Connected to MQTT.");
-      digitalWrite(2, LOW);
-      client.subscribe(channelIn);
-      Serial.print("Listening: ");
-      Serial.println(channelIn);
+      Serial.println("Reconnecting to MQTT...");
+      digitalWrite(2, HIGH);
+      // Attempt to connect
+      client.setServer(currentMqttSettings[1], atoi(currentMqttSettings[2]));
+      if (connect(hostname, currentMqttSettings[3], currentMqttSettings[4]))
+      {
+        Serial.println("Connected to MQTT.");
+        digitalWrite(2, LOW);
+        client.subscribe(channelIn);
+        Serial.print("Listening: ");
+        Serial.println(channelIn);
 
-      publishStatus(false);
+        publishStatus(false);
+      }
     }
   }
   return client.connected();
@@ -113,12 +114,8 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
     root["receivedCount"] = status.receivedCount;
 
     JsonObject sensors = root.createNestedObject("sensors");
-    sensors["tempm1"]=status.tempm1;
-    sensors["tempm2"]=status.tempm1;
-    // for (size_t i = 0; i < SensorCount; i++)
-    // {
-    //   sensors[pinsSettings.sensors[i].name] = status.sensors[i];
-    // }
+    sensors["tempm1"] = status.tempm1;
+    sensors["tempm2"] = status.tempm2;
 
     serializeJson(doc, tempBuffer);
     client.publish(channelStatus, tempBuffer);
@@ -133,7 +130,7 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
 
 void MqttPubSub::handle()
 {
-  if (WiFi.status() == WL_CONNECTED)
+  if (status.SSID != "")
   {
     if (!client.connected())
     {
@@ -167,10 +164,6 @@ void MqttPubSub::handle()
       // Client connected
       client.loop();
     }
-  }
-  else
-  {
-    // Serial.println("Mqtt - WiFi not connected!");
   }
 }
 
