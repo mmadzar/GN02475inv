@@ -41,12 +41,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <WebServer.h>
 #include <HTTPUpdateServer.h>
 #include <ESPmDNS.h>
-#include <ArduinoOTA.h>
 #include <FS.h>
 #include <Ticker.h>
 
@@ -81,15 +80,10 @@
 
 // HardwareSerial Inverter(INVERTER_PORT);
 
+const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
-
-WebServer server(80);
-HTTPUpdateServer updater;
-// holds the current upload
-File fsUploadFile;
-Ticker sta_tick;
 
 long lastLoopReport = 0;
 Status status;
@@ -99,6 +93,12 @@ MqttSettings mqttSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
 TempSensorNTC temps;
+
+WebServer server(80);
+HTTPUpdateServer updater;
+// holds the current upload
+File fsUploadFile;
+Ticker sta_tick;
 
 // SWD over ESP8266
 /*
@@ -537,9 +537,9 @@ bool uart_readStartsWith(const char *val)
 
 static void sendCommand(String cmd)
 {
-  DBG_OUTPUT_PORT.println("Sending '" + cmd + "' to inverter");
+  // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
+  //  // Inverter.print("\n");
   wifiport.addBuffer(cmd.c_str(), cmd.length());
-  // Inverter.print("\n");
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
@@ -553,60 +553,36 @@ static void sendCommand(String cmd)
   uart_readUntill('\n');
 }
 
-static void handleCommand()
+static String handleCmd(String cmd, int repeat)
 {
-  const int cmdBufSize = 128;
-  String cmd;
-  int repeat = 0;
+  String output;
   char buffer[255];
   size_t len = 0;
-  String output;
-  bool mqttCmd = !(status.inverterSend[0] == 0x00 || status.inverterSend == "");
-  if (!mqttCmd)
-  {
-    if (!server.hasArg("cmd"))
-    {
-      server.send(500, "text/plain", "BAD ARGS");
-      return;
-    }
-
-    cmd = server.arg("cmd").substring(0, cmdBufSize);
-    if (server.hasArg("repeat"))
-      repeat = server.arg("repeat").toInt();
-
-    if (!fastUart && fastUartAvailable)
-    {
-      sendCommand("fastuart");
-      if (uart_readStartsWith("OK"))
-      {
-        // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-        // Inverter.updateBaudRate(921600);
-        uart_set_baudrate(INVERTER_PORT, 921600);
-        fastUart = true;
-      }
-      else
-      {
-        fastUartAvailable = false;
-      }
-    }
-  }
-  else
-  {
-    cmd = String(status.inverterSend);
-  }
+  // if (!fastUart && fastUartAvailable)
+  // {
+  //   sendCommand("fastuart");
+  //   if (uart_readStartsWith("OK"))
+  //   {
+  //     // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
+  //     // Inverter.updateBaudRate(921600);
+  //     uart_set_baudrate(INVERTER_PORT, 921600);
+  //     fastUart = true;
+  //   }
+  //   else
+  //   {
+  //     fastUartAvailable = false;
+  //   }
+  // }
 
   sendCommand(cmd);
   do
   {
     memset(buffer, 0, sizeof(buffer));
     // len = Inverter.readBytes(buffer, sizeof(buffer) - 1);
-    len = uart_read_bytes(UART_NUM_2, buffer, sizeof(buffer), UART_TIMEOUT);
+    len = uart_read_bytes(UART_NUM_2, buffer, String(buffer).length(), UART_TIMEOUT);
     if (len > 0)
       output.concat(buffer, len); // += buffer;
-
-    // add to debug wifi port
     wifiport.addBuffer(buffer, len);
-    wifiport.handle();
 
     if (repeat)
     {
@@ -617,16 +593,31 @@ static void handleCommand()
       uart_read_bytes(UART_NUM_2, buffer, 1, UART_TIMEOUT);
     }
   } while (len > 0);
-  // DBG_OUTPUT_PORT.println(output);
-  if (!mqttCmd)
+
+  // if (output.length() == 0)
+  //   output = "error";
+  DBG_OUTPUT_PORT.print("output in sendCommand ");
+  DBG_OUTPUT_PORT.println(output);
+  return output;
+}
+
+static void handleCommand()
+{
+  const int cmdBufSize = 128;
+  if (!server.hasArg("cmd"))
   {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "text/json", output);
+    server.send(500, "text/plain", "BAD ARGS");
+    return;
   }
-  else
-  {
-    mqtt.sendMessage(output.c_str(), String(HOST_NAME) + "/out/response");
-  }
+  String cmd = server.arg("cmd").substring(0, cmdBufSize);
+  int repeat = 0;
+  String outp;
+
+  if (server.hasArg("repeat"))
+    repeat = server.arg("repeat").toInt();
+  outp = handleCmd(cmd, repeat);
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "text/json", outp);
 }
 
 static uint32_t crc32_word(uint32_t Crc, uint32_t Data)
@@ -872,28 +863,28 @@ void setup(void)
 #ifdef WIFI_IS_OFF_AT_BOOT
   enableWiFiAtBootTime();
 #endif
+  WiFi.setHostname(HOST_NAME);
   WiFi.mode(WIFI_AP_STA);
   // WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.setSleep(false);
   WiFi.setTxPower(WIFI_POWER_19_5dBm); // 25); //dbm
-  // WiFi.begin();
-  sta_tick.attach(10, staCheck);
 
   wota.setupWiFi();
   wota.setupOTA();
   temps.setup();
+  sta_tick.attach(10, staCheck);
+
+  MDNS.begin(host);
+
+  updater.setup(&server);
+  DBG_OUTPUT_PORT.println("setup wifiport...");
   wifiport.setup();
   mqtt.setup();
 
-  MDNS.begin(HOST_NAME);
-
-  updater.setup(&server);
-
-  // SERVER INIT
+  // // SERVER INIT
   // ArduinoOTA.setHostname(host);
   // ArduinoOTA.begin();
-
-  // list directory
+  // // list directory
   server.on("/list", HTTP_GET, handleFileList);
 
   server.on("/rtc/now", HTTP_GET, handleRTCNow);
@@ -1119,7 +1110,7 @@ void setup(void)
         addr = 0x08001000;
         addrEnd = 0x0801ffff;
       }
-      
+
       server.sendHeader("Content-Disposition", "attachment; filename = \"" + filename + "\"");
       server.setContentLength(addrEnd - addr + 1); //CONTENT_LENGTH_UNKNOWN
       server.send(200, "application/octet-stream", "");
@@ -1132,7 +1123,7 @@ void setup(void)
         //uint8_t* buff;
         //swd.binDump(addrNext, buff);
         //server.sendContent(String((char *)buff));
-        
+
         uint8_t byte;
         swd.memLoadByte(addrNext, byte);
         server.sendContent(String(byte));
@@ -1189,7 +1180,7 @@ void setup(void)
             }
 
             //digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-            
+
             uint8_t PAGE_SIZE = 6; //webserver max chunks
             for (uint8_t p = 0; p < PAGE_SIZE; p++)
             {
@@ -1219,7 +1210,7 @@ void setup(void)
             }
             swd.flashloaderRUN(addrNext, addrBuffer);
             delay(400); //Must wait for flashloader to finish
- 
+
             addrBuffer = 0x00000000;
             addrNext = addrIndex;
           }
@@ -1321,24 +1312,31 @@ void loop(void)
   // note: ArduinoOTA.handle() calls MDNS.update();
   server.handleClient();
   // ArduinoOTA.handle();
-
   status.currentMillis = millis();
   wota.handleWiFi();
   wota.handleOTA();
   wifiport.handle();
-  mqtt.handle();
 
-  if (status.inverterSend != "" && status.inverterSend[0] != 0x00)
+  if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
   {
-    handleCommand();
+    DBG_OUTPUT_PORT.print("Detected send content ");
+    DBG_OUTPUT_PORT.println(status.inverterSend);
+    String r = handleCmd(status.inverterSend, 0);
+    DBG_OUTPUT_PORT.print("Received result ");
+    DBG_OUTPUT_PORT.println(r);
     status.inverterSend[0] = 0x00;
+    mqtt.sendMessage(r, String(HOST_NAME) + "/out/response");
+    DBG_OUTPUT_PORT.println("mqtt message sent!");
   }
   if (temps.handle())
   {
     mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
     mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
   }
+  // if (status.loops % 10 == 0)
+  mqtt.handle();
 
+  /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
   {                        // have connections so stop logging
     startLogAttempt = 0;   // restart log attempts when next disconnected
@@ -1376,7 +1374,7 @@ void loop(void)
       }
     }
   }
-
+*/
   mqtt.publishStatus(true);
 
   if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement

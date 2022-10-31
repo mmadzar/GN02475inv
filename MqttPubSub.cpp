@@ -33,7 +33,9 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
   {
     if (cmd == "restart" && String(msg).toInt() == 1)
       ESP.restart();
-    if (cmd.equals("inverter"))
+    else if (cmd == "reconnect" && String(msg).toInt() == 1)
+      WiFi.disconnect(false, false);
+    else if (cmd.equals("inverter"))
     {
       String(msg).toCharArray(status.inverterSend, length + 1);
     }
@@ -132,6 +134,9 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
 
 void MqttPubSub::handle()
 {
+  if (status.SSID == "")
+    lastReconnectAttempt = -10000; // reconnects as soon as connected to WiFi
+
   if (status.SSID != "")
   {
     if (!client.connected())
@@ -145,7 +150,7 @@ void MqttPubSub::handle()
         if (reconnect())
         {
           lastReconnectAttempt = 0;
-          Serial.print("mqtt connected."); // Expired waiting on 0inactive connection...");
+          Serial.print("mqtt connected."); // Expired waiting on inactive connection...");
         }
       }
     }

@@ -3,18 +3,11 @@
 // ZzFyTv8/gsm0qf8+1YF9 - open-ssl rand 15 chars base64 encoded - total 20 chars
 // Vem6G0L/RfeQtl5k0BLB
 
-#include <WiFi.h>
-#include <WiFiMulti.h>
-#include <esp_wifi.h>
-#include <ESPmDNS.h>
-#include <ArduinoOTA.h>
 #include "WiFiOTA.h"
 
 WiFiMulti WiFiMulti;
 wifi_sta_list_t wifi_sta_list;
 tcpip_adapter_sta_list_t adapter_sta_list;
-long lastReconnect = 0;
-bool connectionInProgress = false;
 char *buff = new char[50];
 char *buff2 = new char[50];
 IPAddress ipA;
@@ -31,12 +24,10 @@ void WiFiOTA::setupWiFi()
     Serial.println(wifiSettings.APs[i][0]);
     WiFiMulti.addAP(wifiSettings.APs[i][0], wifiSettings.APs[i][1], wifiSettings.APs[i][2]);
   }
-
-  Serial.print("Conecting to WiFi... ");
-  WiFi.disconnect(false, false);
-
+  Serial.print("WiFi setup... ");
+  WiFi.setHostname(HOST_NAME);
   WiFi.onEvent(WiFiEvent);
-  ReconnectWiFi();
+  handleWiFi();
 }
 
 void WiFiOTA::ReconnectWiFi()
@@ -44,24 +35,14 @@ void WiFiOTA::ReconnectWiFi()
   WiFiMulti.run();
 }
 
+bool connecting = false;
 void WiFiOTA::handleWiFi()
 {
-  wl_status_t ws;
-  ws = WiFi.status();
-  //cleanup this
-  if ((ws == WL_DISCONNECTED || ws == WL_CONNECTION_LOST) && !connectionInProgress && status.currentMillis - lastReconnect > 5000)
+  // check for status here to avoid SSID check on run()
+  if (!connecting && WiFi.status() != WL_CONNECTED)
   {
-    lastReconnect = status.currentMillis;
-    connectionInProgress = true;
-    if (ws != WL_DISCONNECTED)
-    {
-      Serial.print("disconnecting...");
-      WiFi.disconnect(false);
-    }
+    connecting = true;
     WiFi.persistent(false);
-    Serial.print("reconnecting wifi... timeout: ");
-    Serial.println(ws);
-    Serial.println(status.currentMillis - lastReconnect > 5000);
     ReconnectWiFi();
   }
 }
@@ -71,7 +52,7 @@ void WiFiOTA::setupOTA()
   // OTA configuration
   // Port defaults to 3232
   // ArduinoOTA.setPort(3232);
-  ArduinoOTA.setHostname(wifiSettings.hostname);
+  ArduinoOTA.setHostname(HOST_NAME);
   ArduinoOTA.setPassword(wifiSettings.passwordOTA);
   ArduinoOTA
       .onStart([]()
@@ -126,35 +107,27 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     break;
   case SYSTEM_EVENT_SCAN_DONE:
     Serial.println("Completed scan for access points");
-    Serial.println(WiFi.SSID());
-    connectionInProgress = false;
     break;
   case SYSTEM_EVENT_STA_START:
     Serial.println("WiFi client started");
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_STOP:
     Serial.println("WiFi clients stopped");
-    WiFiMulti.run();
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_CONNECTED:
     Serial.print("Connected to access point ");
-    Serial.println(WiFi.SSID());
-    connectionInProgress = false;
     break;
   case SYSTEM_EVENT_STA_DISCONNECTED:
     Serial.println("Disconnected from WiFi access point");
-    Serial.println(WiFi.SSID());
     digitalWrite(2, HIGH);
     status.ipAddress = "none";
     status.gatewayAddress = "255.255.255.255";
     status.SSID = "";
-    connectionInProgress = false;
+    connecting = false;
+    WiFi.disconnect(false, false);
     break;
   case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
     Serial.println("Authentication mode of access point has changed");
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_GOT_IP:
     Serial.print("IP address: ");
@@ -177,23 +150,19 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.print(" RSSI: ");
     Serial.println(status.rssi);
     Serial.println("...");
+    connecting = false;
     break;
   case SYSTEM_EVENT_STA_LOST_IP:
     Serial.println("Lost IP address and IP address is reset to 0");
-    Serial.println(WiFi.SSID());
-    connectionInProgress = false;
     break;
   case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
     Serial.println("WiFi Protected Setup (WPS): succeeded in enrollee mode");
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_WPS_ER_FAILED:
     Serial.println("WiFi Protected Setup (WPS): failed in enrollee mode");
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
     Serial.println("WiFi Protected Setup (WPS): timeout in enrollee mode");
-    Serial.println(WiFi.SSID());
     break;
   case SYSTEM_EVENT_STA_WPS_ER_PIN:
     Serial.println("WiFi Protected Setup (WPS): pin code in enrollee mode");

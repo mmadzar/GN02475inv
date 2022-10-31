@@ -20,9 +20,6 @@ struct Status
   double tempm2 = 0; // motor temperature 2
   long receivedCount = 0;
 
-  int sensors[SensorCount];
-  int switches[SwitchCount];
-
   char inverterSend[128];
 };
 
