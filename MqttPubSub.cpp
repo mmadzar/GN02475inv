@@ -43,6 +43,7 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
   }
 }
 
+
 bool MqttPubSub::reconnect()
 {
   if (status.SSID != "")
@@ -68,17 +69,15 @@ bool MqttPubSub::reconnect()
     if (currentMqttSettings[1] != "")
     {
       Serial.println("Reconnecting to MQTT...");
-      digitalWrite(2, HIGH);
       // Attempt to connect
       client.setServer(currentMqttSettings[1], atoi(currentMqttSettings[2]));
       if (connect(hostname, currentMqttSettings[3], currentMqttSettings[4]))
       {
         Serial.println("Connected to MQTT.");
-        digitalWrite(2, LOW);
         client.subscribe(channelIn);
         Serial.print("Listening: ");
         Serial.println(channelIn);
-
+        digitalWrite(pinsSettings.led, LOW);
         publishStatus(false);
       }
     }
@@ -141,15 +140,17 @@ void MqttPubSub::handle()
   {
     if (!client.connected())
     {
-      long currentMillis = millis();
-      if (currentMillis - lastReconnectAttempt > 10000) // reconnect to MQTT every 10 seconds
+      digitalWrite(2, HIGH);                                                                                                                                                                                                                                               // set notification led
+      if (!(status.currentMillis - lastReconnectAttempt < 200 || (status.currentMillis - lastReconnectAttempt > 500 && status.currentMillis - lastReconnectAttempt < 700) || (status.currentMillis - lastReconnectAttempt > 1000 && status.currentMillis - lastReconnectAttempt < 1200))) // reset notification led
+        digitalWrite(2, LOW);
+      if (status.currentMillis - lastReconnectAttempt > 10000) // reconnect to MQTT every 10 seconds
       {
-        Serial.println("Mqtt - Client not connected!");
-        lastReconnectAttempt = currentMillis;
+        // Serial.println("Mqtt - Client not connected!");
+        lastReconnectAttempt = status.currentMillis;
         // Attempt to reconnect
         if (reconnect())
         {
-          lastReconnectAttempt = 0;
+          lastReconnectAttempt = -10000;
           Serial.print("mqtt connected."); // Expired waiting on inactive connection...");
         }
       }

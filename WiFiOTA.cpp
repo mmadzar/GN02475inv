@@ -12,6 +12,7 @@ char *buff = new char[50];
 char *buff2 = new char[50];
 IPAddress ipA;
 IPAddress ipAG;
+
 WiFiOTA::WiFiOTA()
 {
 }
@@ -26,6 +27,7 @@ void WiFiOTA::setupWiFi()
   }
   Serial.print("WiFi setup... ");
   WiFi.setHostname(HOST_NAME);
+  WiFi.persistent(false);
   WiFi.onEvent(WiFiEvent);
   handleWiFi();
 }
@@ -35,16 +37,11 @@ void WiFiOTA::ReconnectWiFi()
   WiFiMulti.run();
 }
 
-bool connecting = false;
 void WiFiOTA::handleWiFi()
 {
   // check for status here to avoid SSID check on run()
-  if (!connecting && WiFi.status() != WL_CONNECTED)
-  {
-    connecting = true;
-    WiFi.persistent(false);
-    ReconnectWiFi();
-  }
+  if (WiFi.status() != WL_CONNECTED) // request for status
+      ReconnectWiFi();
 }
 
 void WiFiOTA::setupOTA()
@@ -106,7 +103,8 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.println("WiFi interface ready");
     break;
   case SYSTEM_EVENT_SCAN_DONE:
-    Serial.println("Completed scan for access points");
+    Serial.println("Completed scan for access points.");
+    //  WiFi.disconnect(false, false);
     break;
   case SYSTEM_EVENT_STA_START:
     Serial.println("WiFi client started");
@@ -118,12 +116,11 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.print("Connected to access point ");
     break;
   case SYSTEM_EVENT_STA_DISCONNECTED:
-    Serial.println("Disconnected from WiFi access point");
+    Serial.printf("Disconnected from WiFi access point. Disconnecting... %s\n", status.SSID);
     digitalWrite(2, HIGH);
     status.ipAddress = "none";
     status.gatewayAddress = "255.255.255.255";
     status.SSID = "";
-    connecting = false;
     WiFi.disconnect(false, false);
     break;
   case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
@@ -150,7 +147,6 @@ void WiFiOTA::WiFiEvent(WiFiEvent_t event)
     Serial.print(" RSSI: ");
     Serial.println(status.rssi);
     Serial.println("...");
-    connecting = false;
     break;
   case SYSTEM_EVENT_STA_LOST_IP:
     Serial.println("Lost IP address and IP address is reset to 0");
