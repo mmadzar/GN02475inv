@@ -84,7 +84,7 @@ const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
-
+long lastInverterReqSend = 0; // last time inverter status requested
 long lastLoopReport = 0;
 Status status;
 Intervals intervals;
@@ -539,7 +539,8 @@ static void sendCommand(String cmd)
 {
   // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
   //  // Inverter.print("\n");
-  wifiport.addBuffer(cmd.c_str(), cmd.length());
+  //wifiport.addBuffer(cmd.c_str(), cmd.length());
+
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
   // while(Inverter.available())
@@ -594,10 +595,6 @@ static String handleCmd(String cmd, int repeat)
     }
   } while (len > 0);
 
-  // if (output.length() == 0)
-  //   output = "error";
-  DBG_OUTPUT_PORT.print("output in sendCommand ");
-  DBG_OUTPUT_PORT.println(output);
   return output;
 }
 
@@ -1307,15 +1304,27 @@ void binaryLoggingStop()
   uart_flush(INVERTER_PORT);
 }
 
+void requestInverterStatus()
+{
+  // ask for inverter status every second
+  if (status.currentMillis - lastInverterReqSend > 1000)
+  {
+    lastInverterReqSend = status.currentMillis;
+    handleCmd("get opmode,lasterr,speed,tmphs,cpuload", 0);
+  }
+}
+
 void loop(void)
 {
   // note: ArduinoOTA.handle() calls MDNS.update();
   server.handleClient();
   // ArduinoOTA.handle();
   status.currentMillis = millis();
+
+  //requestInverterStatus();
   wota.handleWiFi();
   wota.handleOTA();
-  wifiport.handle();
+  //wifiport.handle();
 
   if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
   {
@@ -1328,13 +1337,13 @@ void loop(void)
     mqtt.sendMessage(r, String(HOST_NAME) + "/out/response");
     DBG_OUTPUT_PORT.println("mqtt message sent!");
   }
-  if (temps.handle())
-  {
-    mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
-    mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
-  }
-  // if (status.loops % 10 == 0)
-  mqtt.handle();
+  // if (temps.handle())
+  // {
+  //   mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
+  //   mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
+  // }
+  if (status.loops % 10 == 0)
+    mqtt.handle();
 
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
@@ -1376,7 +1385,6 @@ void loop(void)
   }
 */
   mqtt.publishStatus(true);
-
   if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
   {
     status.freeMem = esp_get_free_heap_size();
