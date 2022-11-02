@@ -32,12 +32,10 @@ private:
   char channelRaw[50];
   char channelIn[50];
   char channelOut[50];
-  int idx1;
-  int idx2;
   long bytesCount = 0;
 
   const char *hostname;
-  const char *currentMqttSettings[5];
+  WiFiConfig currentMqttConfig;
   WiFiClient espClient;
   bool connect(const char *id, const char *username, const char *password);
   bool reconnect();

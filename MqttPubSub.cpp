@@ -18,6 +18,8 @@ void MqttPubSub::setup()
   client.setBufferSize(512);
   client.setKeepAlive(30);
   client.setCallback(callback);
+  
+  SETTINGS.loadSettings();
 }
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
@@ -43,35 +45,31 @@ void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
   }
 }
 
-
 bool MqttPubSub::reconnect()
 {
   if (status.SSID != "")
   {
-    if (status.SSID != currentMqttSettings[0])
+    if (status.SSID != String(currentMqttConfig.ssid))
     {
-      for (size_t i = 0; i < wifiSettings.APsCount; i++)
+      // reset current MQTT configuration
+      for (int i = 0; i < AP_COUNT; i++)
       {
-        if (status.SSID.equals(mqttSettings.Servers[i][0]))
+        if (strcmp(status.SSID.c_str(), SETTINGS.APlist[i].ssid) == 0)
         {
-          currentMqttSettings[0] = mqttSettings.Servers[i][0];
-          currentMqttSettings[1] = mqttSettings.Servers[i][1];
-          if (currentMqttSettings[1] == "gateway")
-            currentMqttSettings[1] = status.gatewayAddress;
-          currentMqttSettings[2] = mqttSettings.Servers[i][2];
-          currentMqttSettings[3] = mqttSettings.Servers[i][3];
-          currentMqttSettings[4] = mqttSettings.Servers[i][4];
+          memcpy((void *)&currentMqttConfig, (void *)&SETTINGS.APlist[i], sizeof(currentMqttConfig));
+          if (currentMqttConfig.mqtt.server == "gateway")
+            currentMqttConfig.mqtt.server = strdup(status.gatewayAddress);
           break;
         }
       }
     }
 
-    if (currentMqttSettings[1] != "")
+    if (currentMqttConfig.ssid != "")
     {
-      Serial.println("Reconnecting to MQTT...");
+      Serial.println("Connecting to MQTT...");
       // Attempt to connect
-      client.setServer(currentMqttSettings[1], atoi(currentMqttSettings[2]));
-      if (connect(hostname, currentMqttSettings[3], currentMqttSettings[4]))
+      client.setServer(currentMqttConfig.mqtt.server, currentMqttConfig.mqtt.port);
+      if (connect(HOST_NAME, currentMqttConfig.mqtt.username, currentMqttConfig.mqtt.password))
       {
         Serial.println("Connected to MQTT.");
         client.subscribe(channelIn);
@@ -81,8 +79,9 @@ bool MqttPubSub::reconnect()
         publishStatus(false);
       }
     }
+    return client.connected();
   }
-  return client.connected();
+  return false;
 }
 
 bool MqttPubSub::connect(const char *id, const char *username, const char *password)

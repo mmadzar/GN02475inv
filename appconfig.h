@@ -3,9 +3,9 @@
 
 #define HOST_NAME "GN02475inv"
 
-#include "../secrets.h"
 #include <stdint.h>
 #include <Arduino.h>
+#include "../secrets.h"
 
 struct PinsSettings
 {

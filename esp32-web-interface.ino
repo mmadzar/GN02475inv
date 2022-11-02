@@ -57,7 +57,7 @@
 
 #include "appconfig.h"
 #include "status.h"
-#include "WiFiOTA.h"
+#include "shared/WiFiOTA.h"
 #include "MqttPubSub.h"
 #include "Bytes2WiFi.h"
 #include "TempSensorNTC.h"
@@ -89,7 +89,7 @@ long lastLoopReport = 0;
 Status status;
 Intervals intervals;
 WiFiSettings wifiSettings;
-MqttSettings mqttSettings;
+PinsSettings pinsSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
 TempSensorNTC temps;
