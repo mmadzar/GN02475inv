@@ -121,7 +121,7 @@ void Bytes2WiFi::read()
                 {
                     WiFi.disconnect(false, false);
                 }
-                                
+
                 wifiCmdPos = 0;
             }
             else

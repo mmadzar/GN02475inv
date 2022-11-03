@@ -18,7 +18,7 @@ public:
     void addBuffer(const char *buffer, size_t size);
 
 private:
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 1024
     byte content[BUFFER_SIZE];
     int position = 0;
     byte wifiCommand[128];

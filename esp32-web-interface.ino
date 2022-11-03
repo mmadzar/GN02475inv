@@ -56,6 +56,7 @@
 #include "driver/uart.h"
 
 #include "appconfig.h"
+#include "../secrets.h"
 #include "status.h"
 #include "shared/WiFiOTA.h"
 #include "MqttPubSub.h"
@@ -125,6 +126,7 @@ File dataFile;
 int startLogAttempt = 0;
 
 Bytes2WiFi wifiport;
+long loops;
 
 bool createNextSDFile()
 {
@@ -539,7 +541,7 @@ static void sendCommand(String cmd)
 {
   // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
   //  // Inverter.print("\n");
-  //wifiport.addBuffer(cmd.c_str(), cmd.length());
+  // wifiport.addBuffer(cmd.c_str(), cmd.length());
 
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
@@ -1316,15 +1318,13 @@ void requestInverterStatus()
 
 void loop(void)
 {
-  // note: ArduinoOTA.handle() calls MDNS.update();
   server.handleClient();
-  // ArduinoOTA.handle();
   status.currentMillis = millis();
 
-  //requestInverterStatus();
+  // requestInverterStatus();
   wota.handleWiFi();
   wota.handleOTA();
-  //wifiport.handle();
+  // wifiport.handle();
 
   if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
   {
@@ -1384,14 +1384,15 @@ void loop(void)
     }
   }
 */
-  mqtt.publishStatus(true);
-  if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
+  if (status.currentMillis - lastLoopReport >= 1000) // number of loops in 1 second - for performance measurement
   {
     status.freeMem = esp_get_free_heap_size();
     status.minFreeMem = esp_get_minimum_free_heap_size();
+    status.loops = loops;
     lastLoopReport = status.currentMillis;
     DBG_OUTPUT_PORT.println(status.loops);
-    status.loops = 0;
+    loops = 0;
   }
-  status.loops++;
+  mqtt.publishStatus(true);
+  loops++;
 }

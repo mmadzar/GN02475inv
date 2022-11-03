@@ -17,9 +17,9 @@ private:
   int tempPotValue = 0; // used to store value read from device
   double calcValue = 0;
 
-  const int sumValuesCount = 100; // number of samples to collect before sending average 1k = 11687 missedIntervals, 50 = 13583 missedIntervals
+  const int sumValuesCount = 30; // number of samples to collect before sending average 1k = 11687 missedIntervals, 50 = 13583 missedIntervals
   long samplesCollected = 0;
-  const int skipSteps = 3; // skip steps between pin value reads
+  const int skipSteps = 10; // skip steps between pin value reads
   int skipStepsCounter = 0;
 
 public:

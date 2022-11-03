@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 #include <Arduino.h>
-#include "../secrets.h"
 
 struct PinsSettings
 {

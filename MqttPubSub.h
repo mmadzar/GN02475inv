@@ -6,6 +6,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include "appconfig.h"
+#include "../secrets.h"
 #include "status.h"
 
 class MqttPubSub
