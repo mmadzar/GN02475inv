@@ -1,11 +1,17 @@
 #include "Arduino.h"
+#include "status.h"
 #include "MqttMessageHandler.h"
 
 MqttMessageHandler::MqttMessageHandler()
 {
 }
 
-void MqttMessageHandler::HandleMessage(const char *topic, const char *message)
+void MqttMessageHandler::HandleMessage(const char *command, const char *message)
 {
-  Serial.printf("%s %s", topic, message);
+  if (strcmp(command, "inverter") == 0)
+  {
+    //store into status variable for sending in next loop cycle
+    String msg(message);
+    msg.toCharArray(status.inverterSend, msg.length() + 1);
+  }
 }
