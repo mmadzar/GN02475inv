@@ -14,14 +14,13 @@ struct Status
   uint32_t minFreeMem = 0;
   const char *ipAddress = "255.255.255.255";
   const char *gatewayAddress = "255.255.255.255";
+  String SSID = "";
   int8_t rssi = 0;
-
+  double tempm1 = 0; // motor temperature 1
+  double tempm2 = 0; // motor temperature 2
   long receivedCount = 0;
 
-  int sensors[SensorCount];
-  int switches[SwitchCount];
-
-  String inverterSend = "";
+  char inverterSend[128];
 };
 
 extern Status status;

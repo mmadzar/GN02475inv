@@ -15,102 +15,73 @@ void MqttPubSub::setup()
   strcat(channelOut, "/out");
 
   client.setClient(espClient);
-  client.setBufferSize(1024);
+  client.setBufferSize(512);
   client.setKeepAlive(30);
   client.setCallback(callback);
+
+  SETTINGS.loadSettings();
 }
 
 void MqttPubSub::callback(char *topic, byte *message, unsigned int length)
 {
-  char m[length];
+  char msg[length + 1];
   for (size_t i = 0; i < length; i++)
-    m[i] = (char)message[i];
+    msg[i] = (char)message[i];
+  msg[length] = 0x0a; // important to add termination to string! messes string value if ommited
 
-  String msg = String(m);
-  String const cmd = String(topic).substring(String(wifiSettings.hostname).length() + 4, String(topic).length());
+  String t = String(topic);
+  String cmd = t.substring(String(wifiSettings.hostname).length() + 4, t.length());
   if (length > 0)
   {
-    if (cmd == "inverter" && length > 0)
+    if (cmd == "restart" && String(msg).toInt() == 1)
+      ESP.restart();
+    else if (cmd == "reconnect" && String(msg).toInt() == 1)
+      WiFi.disconnect(false, false);
+    else if (cmd.equals("inverter"))
     {
-      // TODO
-      Serial.println("Inverter command... send...");
-      char msg[length + 1];
-      for (size_t cnt = 0; cnt < length + 1; cnt++)
-      {
-        // convert byte to its ascii representation
-        sprintf(&msg[cnt], "%C", message[cnt]);
-      }
-
-      // convert hex representation of message to bytes
-      // Ex. 41 41 41 41 41 -> AAAAA
-      status.inverterSend = String(msg);
-      Serial.println(status.inverterSend);
-      // char tc[2] = {0x00, 0x00};
-      // for (size_t i = 0; i < (length) / 3; i++)
-      // {
-      //   tc[0] = char(message[i * 3]);
-      //   tc[1] = char(message[(i * 3) + 1]);
-      //   status.inverterSend[i] = strtol(tc, 0, 16);
-      //   Serial.println(status.inverterSend[i]);
-      // }
+      String(msg).toCharArray(status.inverterSend, length + 1);
     }
-    else
-    {
-      // for (size_t i = 0; i < SwitchCount; i++)
-      // {
-      //   SwitchConfig *sc = &pinsSettings.switches[i];
-      //   // find switch in settings and set status value by index
-      //   if (String(sc->name).equals(cmd))
-      //   {
-      //     status.switches[i] = msg.toInt();
-      //     break;
-      //   }
-      // }
-    }
-    // Serial.println(msg);
-    // Serial.println(cmd);
     status.receivedCount++;
   }
 }
 
 bool MqttPubSub::reconnect()
 {
-  if (WiFi.SSID() != currentMqttSettings[0])
+  if (status.SSID != "")
   {
-    for (size_t i = 0; i < wifiSettings.APsCount; i++)
+    if (status.SSID != String(currentMqttConfig.ssid))
     {
-      if (WiFi.SSID() == mqttSettings.Servers[i][0])
+      // reset current MQTT configuration
+      for (int i = 0; i < AP_COUNT; i++)
       {
-        currentMqttSettings[0] = mqttSettings.Servers[i][0];
-        currentMqttSettings[1] = mqttSettings.Servers[i][1];
-        if (currentMqttSettings[1] == "gateway")
-          currentMqttSettings[1] = status.gatewayAddress;
-        currentMqttSettings[2] = mqttSettings.Servers[i][2];
-        currentMqttSettings[3] = mqttSettings.Servers[i][3];
-        currentMqttSettings[4] = mqttSettings.Servers[i][4];
-        break;
+        if (strcmp(status.SSID.c_str(), SETTINGS.APlist[i].ssid) == 0)
+        {
+          memcpy((void *)&currentMqttConfig, (void *)&SETTINGS.APlist[i], sizeof(currentMqttConfig));
+          if (strcmp(currentMqttConfig.mqtt.server, "gateway") == 0)
+            currentMqttConfig.mqtt.server = strdup(status.gatewayAddress);
+          break;
+        }
       }
     }
-  }
 
-  if (currentMqttSettings[1] != "")
-  {
-    Serial.println("Reconnecting to MQTT...");
-    digitalWrite(2, HIGH);
-    // Attempt to connect
-    client.setServer(currentMqttSettings[1], atoi(currentMqttSettings[2]));
-    if (connect(hostname, currentMqttSettings[3], currentMqttSettings[4]))
+    if (currentMqttConfig.ssid != "")
     {
-      Serial.println("Connected to MQTT.");
-      digitalWrite(2, LOW);
-      client.subscribe(channelIn);
-      Serial.print("Listening: ");
-      Serial.println(channelIn);
-
-      publishStatus(false);
+      Serial.println("Connecting to MQTT...");
+      // Attempt to connect
+      client.setServer(currentMqttConfig.mqtt.server, currentMqttConfig.mqtt.port);
+      if (connect(HOST_NAME, currentMqttConfig.mqtt.username, currentMqttConfig.mqtt.password))
+      {
+        Serial.println("Connected to MQTT.");
+        client.subscribe(channelIn);
+        Serial.print("Listening: ");
+        Serial.println(channelIn);
+        digitalWrite(pinsSettings.led, LOW);
+        publishStatus(false);
+      }
     }
+    return client.connected();
   }
-  return client.connected();
+  return false;
 }
 
 bool MqttPubSub::connect(const char *id, const char *username, const char *password)
@@ -140,14 +111,13 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
     root["ipAddress"] = status.ipAddress;
     root["gateway"] = status.gatewayAddress;
     root["location"] = "car";
+    root["SSID"] = status.SSID;
     root["RSSI"] = WiFi.RSSI(); // status.rssi;
     root["receivedCount"] = status.receivedCount;
 
     JsonObject sensors = root.createNestedObject("sensors");
-    for (size_t i = 0; i < SensorCount; i++)
-    {
-      sensors[pinsSettings.sensors[i].name] = status.sensors[i];
-    }
+    sensors["tempm1"] = status.tempm1;
+    sensors["tempm2"] = status.tempm2;
 
     serializeJson(doc, tempBuffer);
     client.publish(channelStatus, tempBuffer);
@@ -162,32 +132,25 @@ void MqttPubSub::publishStatus(bool waitForInterval) // TODO pass additional sta
 
 void MqttPubSub::handle()
 {
-  if (WiFi.status() == WL_CONNECTED)
+  if (status.SSID == "")
+    lastReconnectAttempt = -10000; // reconnects as soon as connected to WiFi
+
+  if (status.SSID != "")
   {
     if (!client.connected())
     {
-      long currentMillis = millis();
-      if (currentMillis - lastReconnectAttempt > 10000) // reconnect to MQTT every 10 seconds
+      digitalWrite(2, HIGH);                                                                                                                                                                                                                                                              // set notification led
+      if (!(status.currentMillis - lastReconnectAttempt < 200 || (status.currentMillis - lastReconnectAttempt > 500 && status.currentMillis - lastReconnectAttempt < 700) || (status.currentMillis - lastReconnectAttempt > 1000 && status.currentMillis - lastReconnectAttempt < 1200))) // reset notification led
+        digitalWrite(2, LOW);
+      if (status.currentMillis - lastReconnectAttempt > 10000) // reconnect to MQTT every 10 seconds
       {
-        Serial.println("Mqtt - Client not connected!");
-        lastReconnectAttempt = currentMillis;
+        // Serial.println("Mqtt - Client not connected!");
+        lastReconnectAttempt = status.currentMillis;
         // Attempt to reconnect
         if (reconnect())
         {
-          lastReconnectAttempt = 0;
-          reconnectAttemptsFailed = 0;
-          Serial.print("mqtt connected."); // Expired waiting on 0inactive connection...");
-        }
-        else
-        {
-          reconnectAttemptsFailed++;
-          // if (reconnectAttemptsFailed > 5)
-          // { //no MQTT broker available, try with other WiFi network
-          //   //wait 30 secs before restarting
-          //   //ESP.restart();
-          Serial.print("No MQTT broker available. ");
-          Serial.println(reconnectAttemptsFailed);
-          // }
+          lastReconnectAttempt = -10000;
+          Serial.print("mqtt connected."); // Expired waiting on inactive connection...");
         }
       }
     }
@@ -196,10 +159,6 @@ void MqttPubSub::handle()
       // Client connected
       client.loop();
     }
-  }
-  else
-  {
-    // Serial.println("Mqtt - WiFi not connected!");
   }
 }
 
@@ -225,4 +184,9 @@ void MqttPubSub::sendMesssageToTopic(const char *topic, String message)
   char msg[255];
   message.toCharArray(msg, 255);
   client.publish(topic, msg);
+}
+
+void MqttPubSub::sendMesssageToTopic(const char *topic, const char *message)
+{
+  client.publish(topic, message);
 }
