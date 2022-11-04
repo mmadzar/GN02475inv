@@ -42,7 +42,8 @@
  *
  */
 
-#include <WiFi.h>
+#include "shared/WiFiOTA.h"
+//#include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPUpdateServer.h>
 #include <ESPmDNS.h>
@@ -58,9 +59,9 @@
 #include "appconfig.h"
 #include "../secrets.h"
 #include "status.h"
-#include "shared/WiFiOTA.h"
-#include "MqttPubSub.h"
-#include "Bytes2WiFi.h"
+#include "MqttMessageHandler.h"
+#include "shared/MqttPubSub.h"
+#include "shared/Bytes2WiFi.h"
 #include "TempSensorNTC.h"
 
 #define DBG_OUTPUT_PORT Serial
@@ -539,7 +540,7 @@ bool uart_readStartsWith(const char *val)
 
 static void sendCommand(String cmd)
 {
-  DBG_OUTPUT_PORT.println("Sending cmd to inverter");
+  //DBG_OUTPUT_PORT.println("Sending cmd to inverter");
   //  // Inverter.print("\n");
   // wifiport.addBuffer(cmd.c_str(), cmd.length());
 
@@ -1383,8 +1384,6 @@ void loop(void)
 */
   if (status.currentMillis - lastLoopReport >= 1000) // number of loops in 1 second - for performance measurement
   {
-    status.freeMem = esp_get_free_heap_size();
-    status.minFreeMem = esp_get_minimum_free_heap_size();
     status.loops = loops;
     lastLoopReport = status.currentMillis;
     DBG_OUTPUT_PORT.println(status.loops);

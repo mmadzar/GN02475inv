@@ -1,26 +1,24 @@
 #ifndef STATUS_H_
 #define STATUS_H_
 
-#include <stdint.h>
-#include <Arduino.h>
+#include "shared/status_base.h"
 
-struct Status
+class Status : public StatusBase
 {
-  long loops = 0;
-  long missedSend = 0;
-  long bootedMillis = 0;
-  long currentMillis = 0;
-  uint32_t freeMem = 0;
-  uint32_t minFreeMem = 0;
-  const char *ipAddress = "255.255.255.255";
-  const char *gatewayAddress = "255.255.255.255";
-  String SSID = "";
-  int8_t rssi = 0;
+public:
   double tempm1 = 0; // motor temperature 1
   double tempm2 = 0; // motor temperature 2
-  long receivedCount = 0;
-
   char inverterSend[128];
+
+  JsonObject GenerateJson()
+  {
+
+    JsonObject root = this->PrepareRoot();
+    JsonObject sensors = root.createNestedObject("sensors");
+    sensors["tempm1"] = tempm1;
+    sensors["tempm2"] = tempm2;
+    return root;
+  }
 };
 
 extern Status status;
