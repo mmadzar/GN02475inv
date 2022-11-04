@@ -18,7 +18,7 @@ void MqttPubSub::setup()
   client.setBufferSize(512);
   client.setKeepAlive(30);
   client.setCallback(callback);
-  
+
   SETTINGS.loadSettings();
 }
 
@@ -57,7 +57,7 @@ bool MqttPubSub::reconnect()
         if (strcmp(status.SSID.c_str(), SETTINGS.APlist[i].ssid) == 0)
         {
           memcpy((void *)&currentMqttConfig, (void *)&SETTINGS.APlist[i], sizeof(currentMqttConfig));
-          if (currentMqttConfig.mqtt.server == "gateway")
+          if (strcmp(currentMqttConfig.mqtt.server, "gateway") == 0)
             currentMqttConfig.mqtt.server = strdup(status.gatewayAddress);
           break;
         }
@@ -139,7 +139,7 @@ void MqttPubSub::handle()
   {
     if (!client.connected())
     {
-      digitalWrite(2, HIGH);                                                                                                                                                                                                                                               // set notification led
+      digitalWrite(2, HIGH);                                                                                                                                                                                                                                                              // set notification led
       if (!(status.currentMillis - lastReconnectAttempt < 200 || (status.currentMillis - lastReconnectAttempt > 500 && status.currentMillis - lastReconnectAttempt < 700) || (status.currentMillis - lastReconnectAttempt > 1000 && status.currentMillis - lastReconnectAttempt < 1200))) // reset notification led
         digitalWrite(2, LOW);
       if (status.currentMillis - lastReconnectAttempt > 10000) // reconnect to MQTT every 10 seconds
