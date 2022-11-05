@@ -43,7 +43,6 @@
  */
 
 #include "shared/WiFiOTA.h"
-//#include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPUpdateServer.h>
 #include <ESPmDNS.h>
