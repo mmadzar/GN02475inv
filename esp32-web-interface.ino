@@ -95,6 +95,16 @@ WiFiOTA wota;
 MqttPubSub mqtt;
 TempSensorNTC temps;
 
+long loops = 0;
+long lastLoopReport = 0;
+Status status;
+PinsSettings pins;
+Intervals intervals;
+WiFiSettings wifiSettings;
+MqttSettings mqttSettings;
+WiFiOTA wota;
+MqttPubSub mqtt;
+
 WebServer server(80);
 HTTPUpdateServer updater;
 // holds the current upload
@@ -1390,4 +1400,15 @@ void loop(void)
   }
   mqtt.publishStatus(true);
   loops++;
+}
+
+  if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
+  {
+    status.freeMem = esp_get_free_heap_size();
+    status.minFreeMem = esp_get_minimum_free_heap_size();
+    lastLoopReport = status.currentMillis;
+    Serial.println(status.loops);
+    status.loops = 0;
+  }
+  status.loops++;
 }
