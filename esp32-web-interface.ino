@@ -94,16 +94,9 @@ PinsSettings pinsSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
 TempSensorNTC temps;
-
 long loops = 0;
-long lastLoopReport = 0;
-Status status;
-PinsSettings pins;
-Intervals intervals;
-WiFiSettings wifiSettings;
-MqttSettings mqttSettings;
-WiFiOTA wota;
-MqttPubSub mqtt;
+
+Bytes2WiFi wifiport;
 
 WebServer server(80);
 HTTPUpdateServer updater;
@@ -134,9 +127,6 @@ uint16_t indexSDIObuffer = 0;
 uint16_t blockCountSD = 0;
 File dataFile;
 int startLogAttempt = 0;
-
-Bytes2WiFi wifiport;
-long loops;
 
 bool createNextSDFile()
 {
@@ -549,9 +539,9 @@ bool uart_readStartsWith(const char *val)
 
 static void sendCommand(String cmd)
 {
-  //DBG_OUTPUT_PORT.println("Sending cmd to inverter");
-  //  // Inverter.print("\n");
-  // wifiport.addBuffer(cmd.c_str(), cmd.length());
+  // DBG_OUTPUT_PORT.println("Sending cmd to inverter");
+  //   // Inverter.print("\n");
+  //  wifiport.addBuffer(cmd.c_str(), cmd.length());
 
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   delay(1);
@@ -1324,7 +1314,7 @@ void requestInverterStatus()
   if (status.currentMillis - lastInverterReqSend > 1000)
   {
     lastInverterReqSend = status.currentMillis;
-    handleCmd("get opmode,lasterr,speed,tmphs,cpuload", 0);
+    handleCmd("stream 1 opmode,lasterr,speed,tmphs,cpuload", 0);
   }
 }
 
@@ -1400,15 +1390,4 @@ void loop(void)
   }
   mqtt.publishStatus(true);
   loops++;
-}
-
-  if (status.currentMillis - lastLoopReport > 1000) // number of loops in 1 second - for performance measurement
-  {
-    status.freeMem = esp_get_free_heap_size();
-    status.minFreeMem = esp_get_minimum_free_heap_size();
-    lastLoopReport = status.currentMillis;
-    Serial.println(status.loops);
-    status.loops = 0;
-  }
-  status.loops++;
 }
