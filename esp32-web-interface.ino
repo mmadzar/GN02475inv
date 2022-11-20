@@ -1310,11 +1310,46 @@ void binaryLoggingStop()
 
 void requestInverterStatus()
 {
-  // ask for inverter status every second
+  // ask for inverter status every second, try with 200 ms
   if (status.currentMillis - lastInverterReqSend > 1000)
   {
     lastInverterReqSend = status.currentMillis;
-    handleCmd("stream 1 opmode,lasterr,speed,tmphs,cpuload", 0);
+    // handleCmd("stream 1 opmode,lasterr,tmphs", 0);
+    // add rpm for driving IKE cluster
+    String res(handleCmd("stream 1 opmode,lasterr,tmphs", 0));
+    double sa[3];
+    int r = 0, t = 0;
+    wifiport.addBuffer("start...\r\n", 10);
+    // wifiport.addBuffer(res.c_str(), res.length() - 2);
+    // wifiport.addBuffer("\r\n", 2);
+    // wifiport.addBuffer("received...\r\n", 13);
+    for (int i = 0; i < res.length() - 2; i++)
+    {
+      if (res[i] == ',')
+      {
+        // strdup
+        sa[t] = res.substring(r, i).toDouble();
+        status.receivedCount++;
+        // wifiport.addBuffer("---", 3);
+        // wifiport.addBuffer(sa[t].c_str(), sa[t].length());
+        // wifiport.addBuffer("\r\n", 2);
+        r = (i + 1);
+        t++;
+      }
+    }
+    // get last parameter
+    sa[t] = res.substring(r, res.length() - 2).toDouble();
+    if (sizeof(res) > 2)
+    {
+      wifiport.addBuffer("has size...\r\n", 13);
+      wifiport.send();
+      String mqttmsg = String("{ \"opmode\": ") + sa[0] + ", \"lasterr\": " + sa[1] + ", \"tmphs\": " + sa[2] + "}";
+      wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
+      wifiport.addBuffer("\r\n", 2);
+      mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
+    }
+    wifiport.addBuffer("done.\r\n", 7);
+    wifiport.send();
   }
 }
 
