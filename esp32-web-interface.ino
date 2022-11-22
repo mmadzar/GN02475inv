@@ -1334,8 +1334,6 @@ void requestInverterStatus()
       sa[t] = inverterResponse.substring(r, inverterResponse.length() - 2).toDouble();
       if (sizeof(inverterResponse) > 2)
       {
-        wifiport.addBuffer("has size...\r\n", 13);
-        wifiport.send();
         char bufMsg[128];
         String mqttmsg = String("{ \"opmode\": ");
         mqttmsg.concat(sa[0]);
@@ -1355,7 +1353,7 @@ void requestInverterStatus()
         mqtt.sendMessage(String(sa[3]), String(wifiSettings.hostname) + "/out/inverter/rpm");
         mqtt.sendMessage(String(sa[4]), String(wifiSettings.hostname) + "/out/inverter/pot");
         mqtt.sendMessage(String(sa[5]), String(wifiSettings.hostname) + "/out/inverter/pot2");
-        if (status.currentMillis - lastInverterReqSend > 1000)
+        if (status.currentMillis - lastInverterReqSend > 500)
         {
           lastInverterReqSend = status.currentMillis;
           mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");

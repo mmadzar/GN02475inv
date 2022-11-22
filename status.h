@@ -8,7 +8,7 @@ class Status : public StatusBase
 public:
   double tempm1 = 0; // motor temperature 1
   double tempm2 = 0; // motor temperature 2
-  int queryInverterInterval = 500; // milliseconds between inverter queries - 0 disabled
+  int queryInverterInterval = 300; // milliseconds between inverter queries - 0 disabled
   char inverterSend[128];
 
   JsonObject GenerateJson()
