@@ -1319,10 +1319,6 @@ void requestInverterStatus()
     {
       double sa[5];
       int r = 0, t = 0;
-      wifiport.addBuffer("start...\r\n", 10);
-      // wifiport.addBuffer(res.c_str(), res.length() - 2);
-      // wifiport.addBuffer("\r\n", 2);
-      // wifiport.addBuffer("received...\r\n", 13);
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
         if (inverterResponse.charAt(i) == ',')
@@ -1330,9 +1326,6 @@ void requestInverterStatus()
           // strdup
           sa[t] = inverterResponse.substring(r, i).toDouble();
           status.receivedCount++;
-          // wifiport.addBuffer("---", 3);
-          // wifiport.addBuffer(sa[t].c_str(), sa[t].length());
-          // wifiport.addBuffer("\r\n", 2);
           r = (i + 1);
           t++;
         }
@@ -1368,7 +1361,6 @@ void requestInverterStatus()
           mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
         }
       }
-      wifiport.addBuffer("done.\r\n", 7);
       wifiport.send();
     }
   }
