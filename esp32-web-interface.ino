@@ -42,6 +42,8 @@
  *
  */
 
+#include "appconfig.h"
+#include "status.h"
 #include "shared/WiFiOTA.h"
 #include <WiFiClient.h>
 #include <HTTPUpdateServer.h>
@@ -55,10 +57,6 @@
 #include <time.h>
 #include "driver/uart.h"
 
-#include "appconfig.h"
-#include "../secrets.h"
-#include "status.h"
-#include "MqttMessageHandler.h"
 #include "shared/MqttPubSub.h"
 #include "shared/Bytes2WiFi.h"
 #include "TempSensorNTC.h"
@@ -81,23 +79,24 @@
 
 // HardwareSerial Inverter(INVERTER_PORT);
 
+bool firstRun = true;
 const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
 long lastInverterReqSend = 0; // last time inverter status requested
+long lastInverterCmdSend = 0; // last time inverter stream cmd requested
 long lastLoopReport = 0;
 Status status;
 Intervals intervals;
-WiFiSettings wifiSettings;
 PinsSettings pinsSettings;
+WiFiSettings wifiSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
+Bytes2WiFi wifiport;
 TempSensorNTC temps;
 long loops = 0;
-
-Bytes2WiFi wifiport;
-
+static String inverterResponse;
 WebServer server(80);
 HTTPUpdateServer updater;
 // holds the current upload
@@ -868,7 +867,7 @@ void setup(void)
   WiFi.mode(WIFI_AP_STA);
   // WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm); // 25); //dbm
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm); // 25); //dbm
 
   wota.setupWiFi();
   wota.setupOTA();
@@ -879,8 +878,8 @@ void setup(void)
 
   updater.setup(&server);
   DBG_OUTPUT_PORT.println("setup wifiport...");
-  wifiport.setup();
   mqtt.setup();
+  wifiport.setup(23);
 
   // // SERVER INIT
   // ArduinoOTA.setHostname(host);
@@ -1310,46 +1309,68 @@ void binaryLoggingStop()
 
 void requestInverterStatus()
 {
-  // ask for inverter status every second, try with 200 ms
-  if (status.currentMillis - lastInverterReqSend > 1000)
+  // ask inverter for status every 200ms, send status object only every 1 second
+  if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
-    lastInverterReqSend = status.currentMillis;
-    // handleCmd("stream 1 opmode,lasterr,tmphs", 0);
+    lastInverterCmdSend = status.currentMillis;
     // add rpm for driving IKE cluster
-    String res(handleCmd("stream 1 opmode,lasterr,tmphs", 0));
-    double sa[3];
-    int r = 0, t = 0;
-    wifiport.addBuffer("start...\r\n", 10);
-    // wifiport.addBuffer(res.c_str(), res.length() - 2);
-    // wifiport.addBuffer("\r\n", 2);
-    // wifiport.addBuffer("received...\r\n", 13);
-    for (int i = 0; i < res.length() - 2; i++)
+    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2", 0);
+    if (inverterResponse.length() > 2)
     {
-      if (res[i] == ',')
+      double sa[5];
+      int r = 0, t = 0;
+      wifiport.addBuffer("start...\r\n", 10);
+      // wifiport.addBuffer(res.c_str(), res.length() - 2);
+      // wifiport.addBuffer("\r\n", 2);
+      // wifiport.addBuffer("received...\r\n", 13);
+      for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
-        // strdup
-        sa[t] = res.substring(r, i).toDouble();
-        status.receivedCount++;
-        // wifiport.addBuffer("---", 3);
-        // wifiport.addBuffer(sa[t].c_str(), sa[t].length());
-        // wifiport.addBuffer("\r\n", 2);
-        r = (i + 1);
-        t++;
+        if (inverterResponse.charAt(i) == ',')
+        {
+          // strdup
+          sa[t] = inverterResponse.substring(r, i).toDouble();
+          status.receivedCount++;
+          // wifiport.addBuffer("---", 3);
+          // wifiport.addBuffer(sa[t].c_str(), sa[t].length());
+          // wifiport.addBuffer("\r\n", 2);
+          r = (i + 1);
+          t++;
+        }
       }
-    }
-    // get last parameter
-    sa[t] = res.substring(r, res.length() - 2).toDouble();
-    if (sizeof(res) > 2)
-    {
-      wifiport.addBuffer("has size...\r\n", 13);
+      // get last parameter
+      sa[t] = inverterResponse.substring(r, inverterResponse.length() - 2).toDouble();
+      if (sizeof(inverterResponse) > 2)
+      {
+        wifiport.addBuffer("has size...\r\n", 13);
+        wifiport.send();
+        char bufMsg[128];
+        String mqttmsg = String("{ \"opmode\": ");
+        mqttmsg.concat(sa[0]);
+        mqttmsg.concat(", \"lasterr\": ");
+        mqttmsg.concat(sa[1]);
+        mqttmsg.concat(", \"tmphs\": ");
+        mqttmsg.concat(sa[2]);
+        mqttmsg.concat(", \"rpm\": ");
+        mqttmsg.concat(sa[3]);
+        mqttmsg.concat(", \"pot\": ");
+        mqttmsg.concat(sa[4]);
+        mqttmsg.concat(", \"pot2\": ");
+        mqttmsg.concat(sa[5]);
+        mqttmsg.concat("}");
+        wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
+        wifiport.addBuffer("\r\n", 2);
+        mqtt.sendMessage(String(sa[3]), String(wifiSettings.hostname) + "/out/inverter/rpm");
+        mqtt.sendMessage(String(sa[4]), String(wifiSettings.hostname) + "/out/inverter/pot");
+        mqtt.sendMessage(String(sa[5]), String(wifiSettings.hostname) + "/out/inverter/pot2");
+        if (status.currentMillis - lastInverterReqSend > 1000)
+        {
+          lastInverterReqSend = status.currentMillis;
+          mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
+        }
+      }
+      wifiport.addBuffer("done.\r\n", 7);
       wifiport.send();
-      String mqttmsg = String("{ \"opmode\": ") + sa[0] + ", \"lasterr\": " + sa[1] + ", \"tmphs\": " + sa[2] + "}";
-      wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
-      wifiport.addBuffer("\r\n", 2);
-      mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
     }
-    wifiport.addBuffer("done.\r\n", 7);
-    wifiport.send();
   }
 }
 
@@ -1358,25 +1379,31 @@ void loop(void)
   server.handleClient();
   status.currentMillis = millis();
 
-  requestInverterStatus();
   wota.handleWiFi();
   wota.handleOTA();
   wifiport.handle();
 
-  if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
+  if (!firstRun && strcmp(status.SSID, "") != 0)
   {
-    String r = handleCmd(status.inverterSend, 0);
-    status.inverterSend[0] = 0x00;
-    mqtt.sendMessage(r, String(HOST_NAME) + "/out/response");
-    DBG_OUTPUT_PORT.println("mqtt message sent!");
+    requestInverterStatus();
+    if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
+    {
+      String r = handleCmd(status.inverterSend, 0);
+      status.inverterSend[0] = 0x00;
+      mqtt.sendMessage(r, String(HOST_NAME) + "/out/response");
+      DBG_OUTPUT_PORT.println("mqtt message sent!");
+    }
+    if (temps.handle())
+    {
+      mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
+      mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
+    }
   }
-  if (temps.handle())
-  {
-    mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
-    mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
-  }
-  mqtt.handle();
 
+  if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
+    mqtt.handle();
+
+  firstRun = false;
   /*
   if ((WiFi.softAPgetStationNum() > 0) || (WiFi.status() == WL_CONNECTED))
   {                        // have connections so stop logging
