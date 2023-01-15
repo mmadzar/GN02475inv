@@ -42,6 +42,7 @@
  *
  */
 
+#include <Arduino.h>
 #include "appconfig.h"
 #include "status.h"
 #include "shared/WiFiOTA.h"
@@ -89,7 +90,7 @@ long lastInverterCmdSend = 0; // last time inverter stream cmd requested
 long lastLoopReport = 0;
 Status status;
 Intervals intervals;
-PinsSettings pinsSettings;
+Settings settings;
 WiFiSettings wifiSettings;
 WiFiOTA wota;
 MqttPubSub mqtt;
@@ -878,8 +879,8 @@ void setup(void)
 
   updater.setup(&server);
   DBG_OUTPUT_PORT.println("setup wifiport...");
-  mqtt.setup();
   wifiport.setup(23);
+  mqtt.setup();
 
   // // SERVER INIT
   // ArduinoOTA.setHostname(host);
@@ -1366,7 +1367,6 @@ void requestInverterStatus()
 
 void loop(void)
 {
-  server.handleClient();
   status.currentMillis = millis();
 
   wota.handleWiFi();
@@ -1375,6 +1375,7 @@ void loop(void)
 
   if (!firstRun && strcmp(status.SSID, "") != 0)
   {
+    server.handleClient();
     requestInverterStatus();
     if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
     {
