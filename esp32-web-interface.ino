@@ -570,6 +570,7 @@ static String handleCmd(const char *cmdc, int repeat)
       // Inverter.begin(921600, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
       // Inverter.updateBaudRate(921600);
       uart_set_baudrate(INVERTER_PORT, 921600);
+      status.baudRate = 921600;
       fastUart = true;
     }
     else
@@ -672,6 +673,7 @@ static void handleUpdate()
       // Inverter.begin(115200, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
       // Inverter.updateBaudRate(115200);
       uart_set_baudrate(INVERTER_PORT, 115200);
+      status.baudRate = 115200;
       fastUart = false;
       fastUartAvailable = true; // retry after reboot
     }
@@ -814,6 +816,8 @@ void staCheck()
 void setup(void)
 {
   DBG_OUTPUT_PORT.begin(115200);
+  delay(100); // trying to resolve hangs on boot
+
   // Inverter.setRxBufferSize(50000);
   // Inverter.begin(115200, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
   // Need to use low level Espressif IDF API instead of Serial to get high enough data rates
@@ -1260,6 +1264,7 @@ void binaryLoggingStart()
     if (uart_readStartsWith("OK"))
     {
       uart_set_baudrate(INVERTER_PORT, 2250000);
+      status.baudRate = 2250000;
       fastLoggingActive = true;
       DBG_OUTPUT_PORT.println("Binary logging started");
     }
@@ -1267,12 +1272,14 @@ void binaryLoggingStart()
     {
       dataFile.close();
       uart_set_baudrate(INVERTER_PORT, 2250000);
+      status.baudRate = 2250000;
       uart_write_bytes(INVERTER_PORT, "\n", 1);
       delay(1);
       uart_write_bytes(INVERTER_PORT, "binarylogging 0", strnlen("binarylogging 0", UART_MESSBUF_SIZE));
       uart_write_bytes(INVERTER_PORT, "\n", 1);
       uart_wait_tx_done(INVERTER_PORT, UART_TIMEOUT);
       uart_set_baudrate(INVERTER_PORT, 115200);
+      status.baudRate = 115200;
     }
     delay(10);
     uart_flush(INVERTER_PORT);
@@ -1287,6 +1294,7 @@ void binaryLoggingStop()
   uart_write_bytes(INVERTER_PORT, "\n", 1);
   uart_wait_tx_done(INVERTER_PORT, UART_TIMEOUT);
   uart_set_baudrate(INVERTER_PORT, 115200);
+  status.baudRate = 115200;
   delay(100);
   uart_flush(INVERTER_PORT);
   // data should now have stopped so send command again and check response
@@ -1294,6 +1302,7 @@ void binaryLoggingStop()
   if (uart_readStartsWith("OK"))
   {
     uart_set_baudrate(INVERTER_PORT, 115200);
+    status.baudRate = 115200;
     fastUart = false;
     fastLoggingActive = false;
     dataFile.flush(); // make sure up to date
@@ -1303,6 +1312,7 @@ void binaryLoggingStop()
   else
   { // assume still logging so try again next time round
     uart_set_baudrate(INVERTER_PORT, 2250000);
+    status.baudRate = 2250000;
   }
   delay(10);
   uart_flush(INVERTER_PORT);
@@ -1310,15 +1320,15 @@ void binaryLoggingStop()
 
 void requestInverterStatus()
 {
-  // ask inverter for status every 200ms, send status object only every 1 second
+  // ask inverter for status every set interval, send status object only every 1 second
   if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
     lastInverterCmdSend = status.currentMillis;
     // add rpm for driving IKE cluster
-    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2", 0);
+    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2,il1,il2,il1rms,il2rms", 0);
     if (inverterResponse.length() > 2)
     {
-      double sa[5];
+      double sa[10];
       int r = 0, t = 0;
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
@@ -1336,24 +1346,28 @@ void requestInverterStatus()
       if (sizeof(inverterResponse) > 2)
       {
         char bufMsg[128];
-        String mqttmsg = String("{ \"opmode\": ");
-        mqttmsg.concat(sa[0]);
-        mqttmsg.concat(", \"lasterr\": ");
-        mqttmsg.concat(sa[1]);
-        mqttmsg.concat(", \"tmphs\": ");
-        mqttmsg.concat(sa[2]);
-        mqttmsg.concat(", \"rpm\": ");
-        mqttmsg.concat(sa[3]);
-        mqttmsg.concat(", \"pot\": ");
-        mqttmsg.concat(sa[4]);
-        mqttmsg.concat(", \"pot2\": ");
-        mqttmsg.concat(sa[5]);
-        mqttmsg.concat("}");
-        wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
+        String mqttmsg = String("{ \"opmode\": "); mqttmsg.concat(sa[0]);
+        mqttmsg.concat(", \"lasterr\": "); mqttmsg.concat(sa[1]);
+        mqttmsg.concat(", \"tmphs\": "); mqttmsg.concat(sa[2]);
+        mqttmsg.concat(", \"rpm\": "); mqttmsg.concat(sa[3]);
+        mqttmsg.concat(", \"pot\": "); mqttmsg.concat(sa[4]);
+        mqttmsg.concat(", \"pot2\": "); mqttmsg.concat(sa[5]);
+        mqttmsg.concat(", \"il1\": "); mqttmsg.concat(sa[6]);
+        mqttmsg.concat(", \"il2\": "); mqttmsg.concat(sa[7]);
+        mqttmsg.concat(", \"il1rms\": "); mqttmsg.concat(sa[8]);
+        mqttmsg.concat(", \"il2rms\": "); mqttmsg.concat(sa[9]);
+        mqttmsg.concat("}");        wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
         wifiport.addBuffer("\r\n", 2);
+        mqtt.sendMessage(String(sa[0]), String(wifiSettings.hostname) + "/out/inverter/opmode");
+        mqtt.sendMessage(String(sa[1]), String(wifiSettings.hostname) + "/out/inverter/lasterr");
+        mqtt.sendMessage(String(sa[2]), String(wifiSettings.hostname) + "/out/inverter/tmphs");
         mqtt.sendMessage(String(sa[3]), String(wifiSettings.hostname) + "/out/inverter/rpm");
         mqtt.sendMessage(String(sa[4]), String(wifiSettings.hostname) + "/out/inverter/pot");
         mqtt.sendMessage(String(sa[5]), String(wifiSettings.hostname) + "/out/inverter/pot2");
+        mqtt.sendMessage(String(sa[6]), String(wifiSettings.hostname) + "/out/inverter/il1");
+        mqtt.sendMessage(String(sa[7]), String(wifiSettings.hostname) + "/out/inverter/il2");
+        mqtt.sendMessage(String(sa[8]), String(wifiSettings.hostname) + "/out/inverter/il1rms");
+        mqtt.sendMessage(String(sa[9]), String(wifiSettings.hostname) + "/out/inverter/il2rms");
         if (status.currentMillis - lastInverterReqSend > 500)
         {
           lastInverterReqSend = status.currentMillis;
@@ -1389,10 +1403,10 @@ void loop(void)
       mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
       mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
     }
-  }
 
-  if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
-    mqtt.handle();
+    if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
+      mqtt.handle();
+  }
 
   firstRun = false;
   /*
