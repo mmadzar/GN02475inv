@@ -1,6 +1,7 @@
 #ifndef STATUS_H_
 #define STATUS_H_
 
+#include "appconfig.h"
 #include "shared/status_base.h"
 
 class Status : public StatusBase
@@ -12,6 +13,8 @@ public:
   int queryInverterInterval = 500; // 300 milliseconds between inverter queries - 0 disabled
   char inverterSend[128];
 
+  int collectors[CollectorCount];
+
   JsonObject GenerateJson()
   {
 
@@ -21,6 +24,11 @@ public:
     JsonObject sensors = root.createNestedObject("sensors");
     sensors["tempm1"] = tempm1;
     sensors["tempm2"] = tempm2;
+
+    JsonObject jcollectors = root.createNestedObject("collectors");
+    for (size_t i = 0; i < CollectorCount; i++)
+      jcollectors[settings.collectors[i].name] = collectors[i];
+
     return root;
   }
 };

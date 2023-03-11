@@ -58,6 +58,7 @@
 #include <time.h>
 #include "driver/uart.h"
 
+#include "shared/base/Collector.h"
 #include "shared/MqttPubSub.h"
 #include "shared/Bytes2WiFi.h"
 #include "TempSensorNTC.h"
@@ -88,6 +89,14 @@ char uartMessBuff[UART_MESSBUF_SIZE];
 long lastInverterReqSend = 0; // last time inverter status requested
 long lastInverterCmdSend = 0; // last time inverter stream cmd requested
 long lastLoopReport = 0;
+long tempmSamples = 0;
+
+CollectorConfig *configs[CollectorCount];
+Collector *collectors[CollectorCount];
+Settings settingsCollectors;
+StaticJsonDocument<512> docJ;
+char tempBufferCan[512];
+
 Status status;
 Intervals intervals;
 Settings settings;
@@ -813,8 +822,32 @@ void staCheck()
   }
 }
 
+void setupCollectors()
+{
+  for (size_t i = 0; i < CollectorCount; i++)
+  {
+    CollectorConfig *sc = &settings.collectors[i];
+    configs[i] = new CollectorConfig(sc->name, sc->sendRate);
+    collectors[i] = new Collector(*configs[i]);
+    collectors[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
+                            { 
+                              status.collectors[settingsCollectors.getCollectorIndex(name)]=value;
+                              JsonObject root = docJ.to<JsonObject>();
+                              root["value"]=value;
+                              root["min"]=min;
+                              root["max"]=max;
+                              root["timestamp"]=timestamp;
+                              root["samples"]=samplesCollected;
+
+                              serializeJson(docJ, tempBufferCan);
+                              mqtt.sendMessageToTopic(String(wifiSettings.hostname) + "/out/collectors/" + name, tempBufferCan); });
+    collectors[i]->setup();
+  }
+}
+
 void setup(void)
 {
+  setupCollectors();
   DBG_OUTPUT_PORT.begin(115200);
   delay(100); // trying to resolve hangs on boot
 
@@ -1324,17 +1357,16 @@ void requestInverterStatus()
   if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
     lastInverterCmdSend = status.currentMillis;
-    // add rpm for driving IKE cluster
     inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2,il1,il2,il1rms,il2rms", 0);
     if (inverterResponse.length() > 2)
     {
+      // parse all 10 parameters
       double sa[10];
       int r = 0, t = 0;
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
         if (inverterResponse.charAt(i) == ',')
         {
-          // strdup
           sa[t] = inverterResponse.substring(r, i).toDouble();
           status.receivedCount++;
           r = (i + 1);
@@ -1345,33 +1377,45 @@ void requestInverterStatus()
       sa[t] = inverterResponse.substring(r, inverterResponse.length() - 2).toDouble();
       if (sizeof(inverterResponse) > 2)
       {
-        char bufMsg[128];
-        String mqttmsg = String("{ \"opmode\": "); mqttmsg.concat(sa[0]);
-        mqttmsg.concat(", \"lasterr\": "); mqttmsg.concat(sa[1]);
-        mqttmsg.concat(", \"tmphs\": "); mqttmsg.concat(sa[2]);
-        mqttmsg.concat(", \"rpm\": "); mqttmsg.concat(sa[3]);
-        mqttmsg.concat(", \"pot\": "); mqttmsg.concat(sa[4]);
-        mqttmsg.concat(", \"pot2\": "); mqttmsg.concat(sa[5]);
-        mqttmsg.concat(", \"il1\": "); mqttmsg.concat(sa[6]);
-        mqttmsg.concat(", \"il2\": "); mqttmsg.concat(sa[7]);
-        mqttmsg.concat(", \"il1rms\": "); mqttmsg.concat(sa[8]);
-        mqttmsg.concat(", \"il2rms\": "); mqttmsg.concat(sa[9]);
-        mqttmsg.concat("}");        wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
-        wifiport.addBuffer("\r\n", 2);
-        mqtt.sendMessage(String(sa[0]), String(wifiSettings.hostname) + "/out/inverter/opmode");
-        mqtt.sendMessage(String(sa[1]), String(wifiSettings.hostname) + "/out/inverter/lasterr");
-        mqtt.sendMessage(String(sa[2]), String(wifiSettings.hostname) + "/out/inverter/tmphs");
-        mqtt.sendMessage(String(sa[3]), String(wifiSettings.hostname) + "/out/inverter/rpm");
-        mqtt.sendMessage(String(sa[4]), String(wifiSettings.hostname) + "/out/inverter/pot");
-        mqtt.sendMessage(String(sa[5]), String(wifiSettings.hostname) + "/out/inverter/pot2");
-        mqtt.sendMessage(String(sa[6]), String(wifiSettings.hostname) + "/out/inverter/il1");
-        mqtt.sendMessage(String(sa[7]), String(wifiSettings.hostname) + "/out/inverter/il2");
-        mqtt.sendMessage(String(sa[8]), String(wifiSettings.hostname) + "/out/inverter/il1rms");
-        mqtt.sendMessage(String(sa[9]), String(wifiSettings.hostname) + "/out/inverter/il2rms");
+        uint64_t ts = status.getTimestampMicro();
+        collectors[settingsCollectors.getCollectorIndex(OPMODE)]->handle((int)sa[0], ts);
+        collectors[settingsCollectors.getCollectorIndex(LASTERR)]->handle((int)sa[1], ts);
+        collectors[settingsCollectors.getCollectorIndex(TMPHS)]->handle((int)sa[2] * 100, ts);
+        collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
+        collectors[settingsCollectors.getCollectorIndex(POT)]->handle((int)sa[4], ts);
+        collectors[settingsCollectors.getCollectorIndex(POT2)]->handle((int)sa[5], ts);
+        collectors[settingsCollectors.getCollectorIndex(IL1)]->handle((int)sa[6], ts);
+        collectors[settingsCollectors.getCollectorIndex(IL2)]->handle((int)sa[7], ts);
+        collectors[settingsCollectors.getCollectorIndex(IL1RMS)]->handle((int)sa[8], ts);
+        collectors[settingsCollectors.getCollectorIndex(IL2RMS)]->handle((int)sa[9], ts);
         if (status.currentMillis - lastInverterReqSend > 500)
         {
+          char bufMsg[128];
+          String mqttmsg = String("{ \"opmode\": ");
+          mqttmsg.concat(sa[0]);
+          mqttmsg.concat(", \"lasterr\": ");
+          mqttmsg.concat(sa[1]);
+          mqttmsg.concat(", \"tmphs\": ");
+          mqttmsg.concat(sa[2]);
+          mqttmsg.concat(", \"rpm\": ");
+          mqttmsg.concat(sa[3]);
+          mqttmsg.concat(", \"pot\": ");
+          mqttmsg.concat(sa[4]);
+          mqttmsg.concat(", \"pot2\": ");
+          mqttmsg.concat(sa[5]);
+          mqttmsg.concat(", \"il1\": ");
+          mqttmsg.concat(sa[6]);
+          mqttmsg.concat(", \"il2\": ");
+          mqttmsg.concat(sa[7]);
+          mqttmsg.concat(", \"il1rms\": ");
+          mqttmsg.concat(sa[8]);
+          mqttmsg.concat(", \"il2rms\": ");
+          mqttmsg.concat(sa[9]);
+          mqttmsg.concat("}");
+          wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
+          wifiport.addBuffer("\r\n", 2);
           lastInverterReqSend = status.currentMillis;
-          mqtt.sendMessage(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
+          mqtt.sendMessageToTopic(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
         }
       }
       wifiport.send();
@@ -1395,14 +1439,13 @@ void loop(void)
     {
       String r = handleCmd(status.inverterSend, 0);
       status.inverterSend[0] = 0x00;
-      mqtt.sendMessage(r, String(HOST_NAME) + "/out/response");
+      mqtt.sendMessageToTopic(r, String(HOST_NAME) + "/out/response");
       DBG_OUTPUT_PORT.println("mqtt message sent!");
     }
-    if (temps.handle())
-    {
-      mqtt.sendMessage(String(status.tempm1), String(HOST_NAME) + "/out/sensors/tempm1");
-      mqtt.sendMessage(String(status.tempm2), String(HOST_NAME) + "/out/sensors/tempm2");
-    }
+
+    temps.handle();
+    collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)status.tempm1 * 100.0, status.getTimestampMicro());
+    collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)status.tempm2 * 100.0, status.getTimestampMicro());
 
     if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
       mqtt.handle();

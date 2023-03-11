@@ -31,6 +31,7 @@ bool TempSensorNTC::handle()
     {
       status.tempm1 = calculate(tempValues1 / sumValuesCount);
       status.tempm2 = calculate(tempValues2 / sumValuesCount);
+      
       samplesCollected = 0;
       tempValues1 = 0;
       tempValues2 = 0;
