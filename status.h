@@ -10,9 +10,9 @@ public:
   double tempm1 = 0;               // motor temperature 1
   double tempm2 = 0;               // motor temperature 2
   int baudRate = 9600;             // inverter comms baudrate
-  int queryInverterInterval = 500; // 300 milliseconds between inverter queries - 0 disabled
+  int queryInverterInterval = 333; // 300 milliseconds between inverter queries - 0 disabled
   char inverterSend[128];
-
+  int wifiPortEnabled = 0;
   int collectors[CollectorCount];
 
   JsonObject GenerateJson()
@@ -21,6 +21,8 @@ public:
     JsonObject root = this->PrepareRoot();
     root["queryInverterInterval"] = queryInverterInterval;
     root["baudRate"] = baudRate;
+    root["wifiPortEnabled"] = wifiPortEnabled;
+    
     JsonObject sensors = root.createNestedObject("sensors");
     sensors["tempm1"] = tempm1;
     sensors["tempm2"] = tempm2;

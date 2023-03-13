@@ -18,6 +18,10 @@ void MqttMessageHandler::HandleMessage(const char *command, const char *message,
   {
     status.queryInverterInterval = String(message).toInt();
   }
+  else if (strcmp(command, "wifiPortEnabled") == 0)
+  {
+    status.wifiPortEnabled = String(message).toInt();
+  }
 }
 
 void MqttMessageHandler::callback(char *topic, byte *message, unsigned int length)

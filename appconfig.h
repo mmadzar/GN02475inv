@@ -32,16 +32,16 @@ struct Settings
   CollectorConfig collectors[CollectorCount] = {
       {OPMODE, 500},
       {LASTERR, 500},
-      {TMPHS, 500},
-      {RPM, 500},
-      {POT, 500},
-      {POT2, 500},
-      {IL1, 500},
-      {IL2, 500},
-      {IL1RMS, 500},
-      {IL2RMS, 500},
-      {TMPM1, 500},
-      {TMPM2, 500}};
+      {TMPHS, 0},
+      {RPM, 0},
+      {POT, 0},
+      {POT2, 0},
+      {IL1, 0},
+      {IL2, 0},
+      {IL1RMS, 0},
+      {IL2RMS, 0},
+      {TMPM1, 1000},
+      {TMPM2, 1000}};
 
   int getCollectorIndex(const char *name)
   {

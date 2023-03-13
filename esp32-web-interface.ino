@@ -86,7 +86,6 @@ const char *host = HOST_NAME;
 bool fastUart = false;
 bool fastUartAvailable = true;
 char uartMessBuff[UART_MESSBUF_SIZE];
-long lastInverterReqSend = 0; // last time inverter status requested
 long lastInverterCmdSend = 0; // last time inverter stream cmd requested
 long lastLoopReport = 0;
 long tempmSamples = 0;
@@ -596,8 +595,11 @@ static String handleCmd(const char *cmdc, int repeat)
     len = uart_read_bytes(UART_NUM_2, buffer, sizeof(buffer), UART_TIMEOUT);
     if (len > 0)
       output.concat(buffer, len); // += buffer;
-    wifiport.addBuffer(buffer, len);
-    wifiport.send();
+    if (status.wifiPortEnabled == 1)
+    {
+      wifiport.addBuffer(buffer, len);
+      wifiport.send();
+    }
 
     if (repeat)
     {
@@ -1375,50 +1377,18 @@ void requestInverterStatus()
       }
       // get last parameter
       sa[t] = inverterResponse.substring(r, inverterResponse.length() - 2).toDouble();
-      if (sizeof(inverterResponse) > 2)
-      {
-        uint64_t ts = status.getTimestampMicro();
-        collectors[settingsCollectors.getCollectorIndex(OPMODE)]->handle((int)sa[0], ts);
-        collectors[settingsCollectors.getCollectorIndex(LASTERR)]->handle((int)sa[1], ts);
-        collectors[settingsCollectors.getCollectorIndex(TMPHS)]->handle((int)sa[2] * 100, ts);
-        collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
-        collectors[settingsCollectors.getCollectorIndex(POT)]->handle((int)sa[4], ts);
-        collectors[settingsCollectors.getCollectorIndex(POT2)]->handle((int)sa[5], ts);
-        collectors[settingsCollectors.getCollectorIndex(IL1)]->handle((int)sa[6], ts);
-        collectors[settingsCollectors.getCollectorIndex(IL2)]->handle((int)sa[7], ts);
-        collectors[settingsCollectors.getCollectorIndex(IL1RMS)]->handle((int)sa[8], ts);
-        collectors[settingsCollectors.getCollectorIndex(IL2RMS)]->handle((int)sa[9], ts);
-        if (status.currentMillis - lastInverterReqSend > 500)
-        {
-          char bufMsg[128];
-          String mqttmsg = String("{ \"opmode\": ");
-          mqttmsg.concat(sa[0]);
-          mqttmsg.concat(", \"lasterr\": ");
-          mqttmsg.concat(sa[1]);
-          mqttmsg.concat(", \"tmphs\": ");
-          mqttmsg.concat(sa[2]);
-          mqttmsg.concat(", \"rpm\": ");
-          mqttmsg.concat(sa[3]);
-          mqttmsg.concat(", \"pot\": ");
-          mqttmsg.concat(sa[4]);
-          mqttmsg.concat(", \"pot2\": ");
-          mqttmsg.concat(sa[5]);
-          mqttmsg.concat(", \"il1\": ");
-          mqttmsg.concat(sa[6]);
-          mqttmsg.concat(", \"il2\": ");
-          mqttmsg.concat(sa[7]);
-          mqttmsg.concat(", \"il1rms\": ");
-          mqttmsg.concat(sa[8]);
-          mqttmsg.concat(", \"il2rms\": ");
-          mqttmsg.concat(sa[9]);
-          mqttmsg.concat("}");
-          wifiport.addBuffer(mqttmsg.c_str(), mqttmsg.length());
-          wifiport.addBuffer("\r\n", 2);
-          lastInverterReqSend = status.currentMillis;
-          mqtt.sendMessageToTopic(mqttmsg, String(wifiSettings.hostname) + "/out/inverter");
-        }
-      }
-      wifiport.send();
+
+      uint64_t ts = status.getTimestampMicro();
+      collectors[settingsCollectors.getCollectorIndex(OPMODE)]->handle((int)sa[0], ts);
+      collectors[settingsCollectors.getCollectorIndex(LASTERR)]->handle((int)sa[1], ts);
+      collectors[settingsCollectors.getCollectorIndex(TMPHS)]->handle((int)(sa[2] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
+      collectors[settingsCollectors.getCollectorIndex(POT)]->handle((int)sa[4], ts);
+      collectors[settingsCollectors.getCollectorIndex(POT2)]->handle((int)sa[5], ts);
+      collectors[settingsCollectors.getCollectorIndex(IL1)]->handle((int)sa[6], ts);
+      collectors[settingsCollectors.getCollectorIndex(IL2)]->handle((int)sa[7], ts);
+      collectors[settingsCollectors.getCollectorIndex(IL1RMS)]->handle((int)sa[8], ts);
+      collectors[settingsCollectors.getCollectorIndex(IL2RMS)]->handle((int)sa[9], ts);
     }
   }
 }
@@ -1444,8 +1414,8 @@ void loop(void)
     }
 
     temps.handle();
-    collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)status.tempm1 * 100.0, status.getTimestampMicro());
-    collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)status.tempm2 * 100.0, status.getTimestampMicro());
+    collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)(status.tempm1 * 100.0), status.getTimestampMicro());
+    collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)(status.tempm2 * 100.0), status.getTimestampMicro());
 
     if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
       mqtt.handle();
