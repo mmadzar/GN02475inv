@@ -1417,7 +1417,7 @@ void loop(void)
     collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)(status.tempm1 * 100.0), status.getTimestampMicro());
     collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)(status.tempm2 * 100.0), status.getTimestampMicro());
 
-    if (!firstRun && ((loops % 10 == 0 && status.loops >= 10) || (loops % 5 == 0 && status.loops < 10))) // extra load when on max but we need to enable mqtt coms
+    if (!firstRun && loops % 4 == 0)
       mqtt.handle();
   }
 
