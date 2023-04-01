@@ -21,6 +21,13 @@
 #define IL2RMS "il2rms"
 #define TMPM1 "tmpm1"
 #define TMPM2 "tmpm2"
+#define UAC "uac"
+#define IDC "idc"
+#define FSTAT "fstat"
+#define ANGLE "angle"
+#define DIN_MPROT "din_mprot"
+#define DIN_OCUR "din_ocur"
+#define DIN_EMCYSTOP "din_emcystop"
 
 struct Settings
 {
@@ -28,7 +35,7 @@ struct Settings
 #define ListenChannelsCount 0
   const char *listenChannels[ListenChannelsCount] = {};
 
-#define CollectorCount 12
+#define CollectorCount 19
   CollectorConfig collectors[CollectorCount] = {
       {OPMODE, 500},
       {LASTERR, 500},
@@ -40,6 +47,13 @@ struct Settings
       {IL2, 0},
       {IL1RMS, 0},
       {IL2RMS, 0},
+      {UAC, 0},
+      {IDC, 0},
+      {FSTAT, 0},
+      {ANGLE, 0},
+      {DIN_MPROT, 0},
+      {DIN_OCUR, 0},
+      {DIN_EMCYSTOP, 0},
       {TMPM1, 1000},
       {TMPM2, 1000}};
 

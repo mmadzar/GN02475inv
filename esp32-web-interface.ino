@@ -1359,11 +1359,11 @@ void requestInverterStatus()
   if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
     lastInverterCmdSend = status.currentMillis;
-    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2,il1,il2,il1rms,il2rms", 0);
+    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2,il1,il2,il1rms,il2rms,uac,idc,fstat,angle,din_mprot,din_ocur,din_emcystop", 0);
     if (inverterResponse.length() > 2)
     {
-      // parse all 10 parameters
-      double sa[10];
+      // parse all 17 parameters
+      double sa[17];
       int r = 0, t = 0;
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
@@ -1389,6 +1389,13 @@ void requestInverterStatus()
       collectors[settingsCollectors.getCollectorIndex(IL2)]->handle((int)sa[7], ts);
       collectors[settingsCollectors.getCollectorIndex(IL1RMS)]->handle((int)sa[8], ts);
       collectors[settingsCollectors.getCollectorIndex(IL2RMS)]->handle((int)sa[9], ts);
+      collectors[settingsCollectors.getCollectorIndex(UAC)]->handle((int)sa[10], ts);
+      collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)sa[11], ts);
+      collectors[settingsCollectors.getCollectorIndex(FSTAT)]->handle((int)sa[12], ts);
+      collectors[settingsCollectors.getCollectorIndex(ANGLE)]->handle((int)sa[13], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_MPROT)]->handle((int)sa[14], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_OCUR)]->handle((int)sa[15], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_EMCYSTOP)]->handle((int)sa[16], ts);
     }
   }
 }
