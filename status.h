@@ -10,7 +10,7 @@ public:
   double tempm1 = 0;               // motor temperature 1
   double tempm2 = 0;               // motor temperature 2
   int baudRate = 9600;             // inverter comms baudrate
-  int queryInverterInterval = 333; // 300 milliseconds between inverter queries - 0 disabled
+  int queryInverterInterval = 50;  // 50 milliseconds between inverter queries - 0 disabled
   char inverterSend[128];
   int wifiPortEnabled = 0;
   int collectors[CollectorCount];

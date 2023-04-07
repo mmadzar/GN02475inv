@@ -67,7 +67,7 @@
 #define INVERTER_PORT UART_NUM_2
 #define INVERTER_RX 16
 #define INVERTER_TX 17
-#define UART_TIMEOUT (100 / portTICK_PERIOD_MS)
+#define UART_TIMEOUT (5 / portTICK_PERIOD_MS)
 #define UART_MESSBUF_SIZE 100
 #define LED_BUILTIN 2 // clashes with SDIO, need to change to suit hardware and uncomment lines
 
@@ -1406,8 +1406,11 @@ void loop(void)
 
   if (!firstRun && strcmp(status.SSID, "") != 0)
   {
-    server.handleClient();
+    if (loops % 5 == 0)
+      server.handleClient();
+
     requestInverterStatus();
+
     if (status.inverterSend[0] != 0x00 && status.inverterSend != "")
     {
       String r = handleCmd(status.inverterSend, 0);
@@ -1416,11 +1419,13 @@ void loop(void)
       DBG_OUTPUT_PORT.println("mqtt message sent!");
     }
 
-    temps.handle();
-    collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)(status.tempm1 * 100.0), status.getTimestampMicro());
-    collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)(status.tempm2 * 100.0), status.getTimestampMicro());
+    if (temps.handle())
+    {
+      collectors[settingsCollectors.getCollectorIndex(TMPM1)]->handle((int)(status.tempm1 * 100.0), status.getTimestampMicro());
+      collectors[settingsCollectors.getCollectorIndex(TMPM2)]->handle((int)(status.tempm2 * 100.0), status.getTimestampMicro());
+    }
 
-    if (!firstRun && loops % 4 == 0)
+    if (!firstRun && loops % 15 == 0)
       mqtt.handle();
   }
 
