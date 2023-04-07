@@ -13,21 +13,17 @@
 #define LASTERR "lasterr"
 #define TMPHS "tmphs"
 #define RPM "rpm"
-#define POT "pot"
-#define POT2 "pot2"
-#define IL1 "il1"
-#define IL2 "il2"
-#define IL1RMS "il1rms"
-#define IL2RMS "il2rms"
-#define TMPM1 "tmpm1"
-#define TMPM2 "tmpm2"
-#define UAC "uac"
+#define ILMAX "ilmax"
+#define ILMAXTARGET "ilmaxtarget"
+#define FSLIPSPNT "fslipspnt"
+#define AMP "amp"
 #define IDC "idc"
-#define FSTAT "fstat"
-#define ANGLE "angle"
 #define DIN_MPROT "din_mprot"
 #define DIN_OCUR "din_ocur"
 #define DIN_EMCYSTOP "din_emcystop"
+#define DIN_DESAT "din_desat"
+#define TMPM1 "tmpm1"
+#define TMPM2 "tmpm2"
 
 struct Settings
 {
@@ -35,25 +31,21 @@ struct Settings
 #define ListenChannelsCount 0
   const char *listenChannels[ListenChannelsCount] = {};
 
-#define CollectorCount 19
+#define CollectorCount 15
   CollectorConfig collectors[CollectorCount] = {
       {OPMODE, 500},
       {LASTERR, 500},
       {TMPHS, 0},
       {RPM, 0},
-      {POT, 0},
-      {POT2, 0},
-      {IL1, 0},
-      {IL2, 0},
-      {IL1RMS, 0},
-      {IL2RMS, 0},
-      {UAC, 0},
+      {ILMAX, 0},
+      {ILMAXTARGET, 0},
+      {FSLIPSPNT, 0},
+      {AMP, 0},
       {IDC, 0},
-      {FSTAT, 0},
-      {ANGLE, 0},
       {DIN_MPROT, 0},
       {DIN_OCUR, 0},
       {DIN_EMCYSTOP, 0},
+      {DIN_DESAT, 0},
       {TMPM1, 1000},
       {TMPM2, 1000}};
 

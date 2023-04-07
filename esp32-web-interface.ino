@@ -1359,11 +1359,11 @@ void requestInverterStatus()
   if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
     lastInverterCmdSend = status.currentMillis;
-    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,pot,pot2,il1,il2,il1rms,il2rms,uac,idc,fstat,angle,din_mprot,din_ocur,din_emcystop", 0);
+    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,ilmax,ilmaxtarget,fslipspnt,amp,idc,din_mprot,din_ocur,din_emcystop,din_desat", 0);
     if (inverterResponse.length() > 2)
     {
-      // parse all 17 parameters
-      double sa[17];
+      // parse all 13 parameters
+      double sa[13];
       int r = 0, t = 0;
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
@@ -1383,19 +1383,15 @@ void requestInverterStatus()
       collectors[settingsCollectors.getCollectorIndex(LASTERR)]->handle((int)sa[1], ts);
       collectors[settingsCollectors.getCollectorIndex(TMPHS)]->handle((int)(sa[2] * 100.0), ts);
       collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
-      collectors[settingsCollectors.getCollectorIndex(POT)]->handle((int)sa[4], ts);
-      collectors[settingsCollectors.getCollectorIndex(POT2)]->handle((int)sa[5], ts);
-      collectors[settingsCollectors.getCollectorIndex(IL1)]->handle((int)sa[6], ts);
-      collectors[settingsCollectors.getCollectorIndex(IL2)]->handle((int)sa[7], ts);
-      collectors[settingsCollectors.getCollectorIndex(IL1RMS)]->handle((int)sa[8], ts);
-      collectors[settingsCollectors.getCollectorIndex(IL2RMS)]->handle((int)sa[9], ts);
-      collectors[settingsCollectors.getCollectorIndex(UAC)]->handle((int)sa[10], ts);
-      collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)sa[11], ts);
-      collectors[settingsCollectors.getCollectorIndex(FSTAT)]->handle((int)sa[12], ts);
-      collectors[settingsCollectors.getCollectorIndex(ANGLE)]->handle((int)sa[13], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_MPROT)]->handle((int)sa[14], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_OCUR)]->handle((int)sa[15], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_EMCYSTOP)]->handle((int)sa[16], ts);
+      collectors[settingsCollectors.getCollectorIndex(ILMAX)]->handle((int)sa[4], ts);
+      collectors[settingsCollectors.getCollectorIndex(ILMAXTARGET)]->handle((int)sa[5], ts);
+      collectors[settingsCollectors.getCollectorIndex(FSLIPSPNT)]->handle((int)sa[6], ts);
+      collectors[settingsCollectors.getCollectorIndex(AMP)]->handle((int)sa[7], ts);
+      collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)sa[8], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_MPROT)]->handle((int)sa[9], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_OCUR)]->handle((int)sa[10], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_EMCYSTOP)]->handle((int)sa[11], ts);
+      collectors[settingsCollectors.getCollectorIndex(DIN_DESAT)]->handle((int)sa[12], ts);
     }
   }
 }
