@@ -18,10 +18,9 @@
 #define FSLIPSPNT "fslipspnt"
 #define AMP "amp"
 #define IDC "idc"
-#define DIN_MPROT "din_mprot"
-#define DIN_OCUR "din_ocur"
-#define DIN_EMCYSTOP "din_emcystop"
-#define DIN_DESAT "din_desat"
+#define POT "pot"
+#define TORQUE "torque"
+#define ANGLE "angle"
 #define TMPM1 "tmpm1"
 #define TMPM2 "tmpm2"
 
@@ -31,7 +30,7 @@ struct Settings
 #define ListenChannelsCount 0
   const char *listenChannels[ListenChannelsCount] = {};
 
-#define CollectorCount 15
+#define CollectorCount 14
   CollectorConfig collectors[CollectorCount] = {
       {OPMODE, 500},
       {LASTERR, 500},
@@ -42,10 +41,9 @@ struct Settings
       {FSLIPSPNT, 0},
       {AMP, 0},
       {IDC, 0},
-      {DIN_MPROT, 0},
-      {DIN_OCUR, 0},
-      {DIN_EMCYSTOP, 0},
-      {DIN_DESAT, 0},
+      {POT, 0},
+      {TORQUE, 0},
+      {ANGLE, 0},
       {TMPM1, 1000},
       {TMPM2, 1000}};
 

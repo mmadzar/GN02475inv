@@ -1359,11 +1359,11 @@ void requestInverterStatus()
   if (status.currentMillis - lastInverterCmdSend > status.queryInverterInterval && status.queryInverterInterval > 0)
   {
     lastInverterCmdSend = status.currentMillis;
-    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,ilmax,ilmaxtarget,fslipspnt,amp,idc,din_mprot,din_ocur,din_emcystop,din_desat", 0);
+    inverterResponse = handleCmd("stream 1 opmode,lasterr,tmphs,speed,ilmax,ilmaxtarget,fslipspnt,amp,idc,pot,torque,angle", 0);
     if (inverterResponse.length() > 2)
     {
-      // parse all 13 parameters
-      double sa[13];
+      // parse all 12 parameters
+      double sa[12];
       int r = 0, t = 0;
       for (int i = 0; i < inverterResponse.length() - 2; i++)
       {
@@ -1383,15 +1383,14 @@ void requestInverterStatus()
       collectors[settingsCollectors.getCollectorIndex(LASTERR)]->handle((int)sa[1], ts);
       collectors[settingsCollectors.getCollectorIndex(TMPHS)]->handle((int)(sa[2] * 100.0), ts);
       collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
-      collectors[settingsCollectors.getCollectorIndex(ILMAX)]->handle((int)sa[4], ts);
-      collectors[settingsCollectors.getCollectorIndex(ILMAXTARGET)]->handle((int)sa[5], ts);
-      collectors[settingsCollectors.getCollectorIndex(FSLIPSPNT)]->handle((int)sa[6]*100.0, ts);
-      collectors[settingsCollectors.getCollectorIndex(AMP)]->handle((int)sa[7], ts);
-      collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)sa[8], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_MPROT)]->handle((int)sa[9], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_OCUR)]->handle((int)sa[10], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_EMCYSTOP)]->handle((int)sa[11], ts);
-      collectors[settingsCollectors.getCollectorIndex(DIN_DESAT)]->handle((int)sa[12], ts);
+      collectors[settingsCollectors.getCollectorIndex(ILMAX)]->handle((int)(sa[4] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(ILMAXTARGET)]->handle((int)(sa[5] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(FSLIPSPNT)]->handle((int)sa[6] * 100.0, ts);
+      collectors[settingsCollectors.getCollectorIndex(AMP)]->handle((int)(sa[7] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)(sa[8] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(POT)]->handle((int)sa[9], ts);
+      collectors[settingsCollectors.getCollectorIndex(TORQUE)]->handle((int)(sa[10] * 100.0), ts);
+      collectors[settingsCollectors.getCollectorIndex(ANGLE)]->handle((int)(sa[11] * 100.0), ts);
     }
   }
 }
