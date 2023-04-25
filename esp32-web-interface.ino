@@ -1385,7 +1385,7 @@ void requestInverterStatus()
       collectors[settingsCollectors.getCollectorIndex(RPM)]->handle((int)sa[3], ts);
       collectors[settingsCollectors.getCollectorIndex(ILMAX)]->handle((int)sa[4], ts);
       collectors[settingsCollectors.getCollectorIndex(ILMAXTARGET)]->handle((int)sa[5], ts);
-      collectors[settingsCollectors.getCollectorIndex(FSLIPSPNT)]->handle((int)sa[6], ts);
+      collectors[settingsCollectors.getCollectorIndex(FSLIPSPNT)]->handle((int)sa[6]*100.0, ts);
       collectors[settingsCollectors.getCollectorIndex(AMP)]->handle((int)sa[7], ts);
       collectors[settingsCollectors.getCollectorIndex(IDC)]->handle((int)sa[8], ts);
       collectors[settingsCollectors.getCollectorIndex(DIN_MPROT)]->handle((int)sa[9], ts);
